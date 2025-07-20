@@ -1,0 +1,13 @@
+*.pkl
+*.obj
+
+dataset_prep/
+
+*__pycache__/
+*egg-info*
+
+output/
+results/
+.data/
+data/
+*logs/
