@@ -150,3 +150,6 @@ class DBpediaDataset(BaseTextDataset):
         test_df['label'] = test_df['label'].replace(-1, self.get_num_classes() - 1)
 
         return train_df, test_df
+
+def set_class_num_to_lowest():
+    pass

@@ -15,11 +15,11 @@ python run.py \
 from __future__ import annotations
 
 import argparse
-import logging
 import numpy as np
 from pathlib import Path
 from sklearn.metrics import accuracy_score, classification_report
 import yaml
+import wandb
 
 from automl.core import TextAutoML
 from automl.datasets import (
@@ -29,8 +29,6 @@ from automl.datasets import (
     IMDBDataset,
 )
 
-logger = logging.getLogger(__name__)
-
 FINAL_TEST_DATASET=...  # TBA later
 
 
@@ -39,7 +37,6 @@ def main_loop(
         output_path: Path,
         data_path: Path,
         seed: int,
-        approach: str,
         val_size: float = 0.2,
         vocab_size: int = 10000,
         token_length: int = 128,
@@ -51,6 +48,27 @@ def main_loop(
         data_fraction: int = 1.0,
         load_path: Path = None,
     ) -> None:
+    
+    # Initialize wandb
+    wandb.init(
+        project="text-automl",
+        name=f"{dataset}_epochs{epochs}_lr{lr}_bs{batch_size}",  # Custom run name
+        config={
+            "dataset": dataset,
+            "seed": seed,
+            "val_size": val_size,
+            "vocab_size": vocab_size,
+            "token_length": token_length,
+            "epochs": epochs,
+            "batch_size": batch_size,
+            "lr": lr,
+            "weight_decay": weight_decay,
+            "fraction_layers_to_finetune": fraction_layers_to_finetune,
+            "data_fraction": data_fraction,
+        },
+        tags=[dataset, "distilbert", "text-classification"]  # Add tags for easy filtering
+    )
+    
     match dataset:
         case "ag_news":
             dataset_class = AGNewsDataset
@@ -63,7 +81,7 @@ def main_loop(
         case _:
             raise ValueError(f"Invalid dataset: {dataset}")
 
-    logger.info("Fitting Text AutoML")
+    print("Fitting Text AutoML")
 
     # You do not need to follow this setup or API it's merely here to provide
     # an example of how your AutoML system could be used.
@@ -73,6 +91,7 @@ def main_loop(
     # Get the dataset and create dataloaders
     data_path = Path(data_path) if isinstance(data_path, str) else data_path
     data_info = dataset_class(data_path).create_dataloaders(val_size=val_size, random_state=seed)
+
     train_df = data_info['train_df']
     
     _subsample = np.random.choice(
@@ -85,15 +104,21 @@ def main_loop(
     val_df = data_info.get('val_df', None)
     test_df = data_info['test_df']
     num_classes = data_info['num_classes']
-    logger.info(
-        f"Train size: {len(train_df)}, Validation size: {len(val_df)}, Test size: {len(test_df)}"
-    )
-    logger.info(f"Number of classes: {num_classes}")
+    
+    print(f"Train size: {len(train_df)}, Validation size: {len(val_df)}, Test size: {len(test_df)}")
+    print(f"Number of classes: {num_classes}")
+    
+    # Update wandb config with dataset info
+    wandb.config.update({
+        "train_size": len(train_df),
+        "val_size": len(val_df) if val_df is not None else 0,
+        "test_size": len(test_df),
+        "num_classes": num_classes
+    })
 
     # Initialize the TextAutoML instance with the best parameters
     automl = TextAutoML(
         seed=seed,
-        approach=approach,
         vocab_size=vocab_size,
         token_length=token_length,
         epochs=epochs,
@@ -111,19 +136,22 @@ def main_loop(
         load_path=load_path,
         save_path=output_path,
     )
-    logger.info("Training complete")
+    print("Training complete")
 
     # Predict on the test set
     test_preds, test_labels = automl.predict(test_df)
 
     # Write the predictions of X_test to disk
-    logger.info("Writing predictions to disk")
+    print("Writing predictions to disk")
     with (output_path / "score.yaml").open("w") as f:
         yaml.safe_dump({"val_err": float(val_err)}, f)
-    logger.info(f"Saved validation score at {output_path / 'score.yaml'}")
+    print(f"Saved validation score at {output_path / 'score.yaml'}")
     with (output_path / "test_preds.npy").open("wb") as f:
         np.save(f, test_preds)
-    logger.info(f"Saved test prediction at {output_path / 'test_preds.npy'}")
+    print(f"Saved test prediction at {output_path / 'test_preds.npy'}")
+
+    # Log validation error to wandb
+    wandb.log({"val_error": float(val_err)})
 
     # In case of running on the final exam data, also add the predictions.npy
     # to the correct location for auto evaluation.
@@ -136,17 +164,23 @@ def main_loop(
     # Check if test_labels has missing data
     if not np.isnan(test_labels).any():
         acc = accuracy_score(test_labels, test_preds)
-        logger.info(f"Accuracy on test set: {acc}")
+        print(f"Accuracy on test set: {acc}")
+        
+        # Log test accuracy to wandb
+        wandb.log({"test_accuracy": acc, "test_error": float(1-acc)})
+        
         with (output_path / "score.yaml").open("a+") as f:
             yaml.safe_dump({"test_err": float(1-acc)}, f)
         
         # Log detailed classification report for better insight
-        logger.info("Classification Report:")
-        logger.info(f"\n{classification_report(test_labels, test_preds)}")
+        print("Classification Report:")
+        report = classification_report(test_labels, test_preds)
+        print(f"\n{report}")
     else:
         # This is the setting for the exam dataset, you will not have access to the labels
-        logger.info(f"No test labels available for dataset '{dataset}'")
+        print(f"No test labels available for dataset '{dataset}'")
 
+    wandb.finish()
     return val_err
 
 
@@ -239,7 +273,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    logger.info(f"Running text dataset {args.dataset}\n{args}")
+    print(f"Running text dataset {args.dataset}\n{args}")
 
     if args.output_path is None:
         args.output_path =  (
@@ -253,8 +287,6 @@ if __name__ == "__main__":
 
     args.output_path = Path(args.output_path).absolute()
     args.output_path.mkdir(parents=True, exist_ok=True)
-
-    logging.basicConfig(level=logging.INFO, filename=args.output_path / "run.log")
 
     main_loop(
         dataset=args.dataset,

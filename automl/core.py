@@ -6,21 +6,17 @@ from torch.utils.data import Dataset, DataLoader
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
-from automl.models import SimpleFFNN, LSTMClassifier
 from automl.utils import SimpleTextDataset
 from pathlib import Path
-import logging
 from typing import Tuple
 from collections import Counter
+import wandb
 
 try:
     from transformers import AutoTokenizer, AutoModelForSequenceClassification
     TRANSFORMERS_AVAILABLE = True
 except ImportError:
     TRANSFORMERS_AVAILABLE = False
-
-logger = logging.getLogger(__name__)
-
 
 class TextAutoML:
     def __init__(
@@ -96,15 +92,25 @@ class TextAutoML:
         if weight_decay is not None: self.weight_decay = weight_decay
         if fraction_layers_to_finetune is not None: self.fraction_layers_to_finetune = fraction_layers_to_finetune
         
-        logger.info("Loading and preparing data...")
+        print("Loading and preparing data...")
 
         self.train_texts = train_df['text'].tolist()
         self.train_labels = train_df['label'].tolist()
         self.val_texts = val_df['text'].tolist()
         self.val_labels = val_df['label'].tolist()
         self.num_classes = num_classes
-        logger.info(f"Train class distribution: {Counter(self.train_labels)}")
-        logger.info(f"Val class distribution: {Counter(self.val_labels)}")
+        
+        train_dist = Counter(self.train_labels)
+        val_dist = Counter(self.val_labels)
+        print(f"Train class distribution: {train_dist}")
+        print(f"Val class distribution: {val_dist}")
+        
+        # Log class distributions to wandb if wandb is initialized
+        if wandb.run is not None:
+            wandb.log({
+                "train_class_distribution": dict(train_dist),
+                "val_class_distribution": dict(val_dist)
+            })
 
         dataset = None
 
@@ -162,50 +168,67 @@ class TextAutoML:
             self.model.load_state_dict(_states["model_state_dict"])
             optimizer.load_state_dict(_states["optimizer_state_dict"])
             start_epoch = _states["epoch"]
-            logger.info(f"Resuming from checkpoint at {start_epoch}")
+            print(f"Resuming from checkpoint at {start_epoch}")
 
         for epoch in range(start_epoch, self.epochs):            
             total_loss = 0
+            train_preds = []
+            train_labels_list = []
+            
             for batch in train_loader:
                 self.model.train()
                 optimizer.zero_grad()
 
                 # if isinstance(batch, dict):
-                if isinstance(self.model, AutoModelForSequenceClassification):
-                    inputs = {k: v.to(self.device) for k, v in batch.items()}
-                    outputs = self.model(**inputs)
-                    loss = outputs.loss
-                    labels = inputs['labels']
-                else:
-                    match self.approach:
-                        case "tfidf":
-                            x, y = batch[0].to(self.device), batch[1].to(self.device)
-                            outputs = self.model(x)
-                            labels = y
-                        case "lstm" | "transformer":
-                            inputs = {k: v.to(self.device) for k, v in batch.items()}
-                            outputs = self.model(**inputs)
-                            labels = inputs["labels"]
-                        case _:
-                            raise ValueError("Oops! Wrong approach.")
-
-                    outputs = outputs.logits if self.approach == "transformer" else outputs
-                    loss = criterion(outputs, labels)
+                inputs = {k: v.to(self.device) for k, v in batch.items()}
+                outputs = self.model(**inputs)
+                loss = outputs.loss
+                labels = inputs['labels']
                 loss.backward()
                 optimizer.step()
                 total_loss += loss.item()
+                
+                # Collect predictions and labels for training accuracy
+                with torch.no_grad():
+                    preds = torch.argmax(outputs.logits, dim=1)
+                    train_preds.extend(preds.cpu().numpy())
+                    train_labels_list.extend(labels.cpu().numpy())
 
-            logger.info(f"Epoch {epoch + 1}, Loss: {total_loss:.4f}")
+            # Calculate training accuracy
+            train_acc = accuracy_score(train_labels_list, train_preds)
+            
+            print(f"Epoch {epoch + 1}, Loss: {total_loss:.4f}, Train Accuracy: {train_acc:.4f}")
+            
+            # Log training metrics to wandb
+            if wandb.run is not None:
+                wandb.log({
+                    "epoch": epoch + 1,
+                    "train_loss": total_loss,
+                    "train_accuracy": train_acc,
+                })
 
             if self.val_texts:
                 val_preds, val_labels = self._predict(val_loader)
                 val_acc = accuracy_score(val_labels, val_preds)
-                logger.info(f"Epoch {epoch + 1}, Validation Accuracy: {val_acc:.4f}")
+                print(f"Epoch {epoch + 1}, Validation Accuracy: {val_acc:.4f}")
+                
+                # Log validation accuracy to wandb
+                if wandb.run is not None:
+                    wandb.log({
+                        "epoch": epoch + 1,
+                        "val_accuracy": val_acc,
+                    })
 
         if self.val_texts:
             val_preds, val_labels = self._predict(val_loader)
             val_acc = accuracy_score(val_labels, val_preds)
-            logger.info(f"Epoch {epoch + 1}, Validation Accuracy: {val_acc:.4f}")
+            print(f"Final Validation Accuracy: {val_acc:.4f}")
+            
+            # Log final validation accuracy
+            if wandb.run is not None:
+                wandb.log({
+                    "final_val_accuracy": val_acc,
+                })
 
         if save_path is not None:
             save_path = Path(save_path) if not isinstance(save_path, Path) else save_path
@@ -228,10 +251,9 @@ class TextAutoML:
         labels = []
         with torch.no_grad():
             for batch in val_loader:
-                if isinstance(self.model, AutoModelForSequenceClassification):
-                    inputs = {k: v.to(self.device) for k, v in batch.items() if k != 'labels'}
-                    outputs = self.model(**inputs).logits
-                    labels.extend(batch["labels"])
+                inputs = {k: v.to(self.device) for k, v in batch.items() if k != 'labels'}
+                outputs = self.model(**inputs).logits
+                labels.extend(batch["labels"])
                 preds.extend(torch.argmax(outputs, dim=1).cpu().numpy())
         
         if isinstance(preds, list):

@@ -1,7 +1,5 @@
 from .core import (
     TextAutoML,
-    SimpleFFNN,
-    LSTMClassifier,
     SimpleTextDataset,
 )
 from .datasets import (
@@ -14,8 +12,6 @@ from .datasets import (
 
 __all__ = [
     'TextAutoML',
-    'SimpleFFNN',
-    'LSTMClassifier',
     'SimpleTextDataset',
     'AGNewsDataset',
     'IMDBDataset', 
