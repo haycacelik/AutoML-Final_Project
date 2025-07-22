@@ -127,10 +127,10 @@ def main_loop(
     logger.info("Writing predictions to disk")
     with (output_path / "score.yaml").open("w") as f:
         yaml.safe_dump({"val_err": float(val_err)}, f)
-    logger.info(f"Saved validataion score at {output_path / 'score.yaml'}")
+    logger.info(f"Saved validation score at {output_path / 'score.yaml'}")
     with (output_path / "test_preds.npy").open("wb") as f:
         np.save(f, test_preds)
-    logger.info(f"Saved tet prediction at {output_path / 'test_preds.npy'}")
+    logger.info(f"Saved test prediction at {output_path / 'test_preds.npy'}")
 
     # In case of running on the final exam data, also add the predictions.npy
     # to the correct location for auto evaluation.

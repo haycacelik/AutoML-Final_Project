@@ -43,6 +43,7 @@ class TextAutoML:
         torch.manual_seed(seed)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print(self.device)
         self.approach = approach
         self.vocab_size = vocab_size
         self.token_length = token_length
@@ -186,9 +187,13 @@ class TextAutoML:
                         )
                 case _:
                     raise ValueError("Unsupported approach or missing transformers.")
+                
+        elif self.approach == "transfer-learning":
+
         else:
             raise ValueError(f"Unrecognized approach: {self.approach}")
         
+
         # Training and validating
         self.model.to(self.device)
         assert dataset is not None, f"`dataset` cannot be None here!"
@@ -352,4 +357,6 @@ def freeze_layers(model, fraction_layers_to_finetune: float=1.0) -> None:
     for layer in model.distilbert.transformer.layer[:layers_to_freeze]:
         for param in layer.parameters():
             param.requires_grad = False
+
+
 # end of file
