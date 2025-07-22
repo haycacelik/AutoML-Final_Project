@@ -7,7 +7,6 @@ For a test run:
 2) Run the script: 
 ```
 python run.py \
-    --data-path <path-to-downloaded-data> \
     --dataset amazon \
     --epochs 1
 ```
@@ -48,9 +47,6 @@ def main_loop(
         batch_size: int = 32,
         lr: float = 0.0001,
         weight_decay: float = 0.01,
-        ffnn_hidden: int = 128,
-        lstm_emb_dim: int = 128,
-        lstm_hidden_dim: int = 128,
         fraction_layers_to_finetune: float = 1.0,
         data_fraction: int = 1.0,
         load_path: Path = None,
@@ -104,9 +100,6 @@ def main_loop(
         batch_size=batch_size,
         lr=lr,
         weight_decay=weight_decay,
-        ffnn_hidden=ffnn_hidden,
-        lstm_emb_dim=lstm_emb_dim,
-        lstm_hidden_dim=lstm_hidden_dim,
         fraction_layers_to_finetune=fraction_layers_to_finetune,
     )
 
@@ -200,16 +193,7 @@ if __name__ == "__main__":
             " i.e. torch, numpy, pandas, sklearn, etc."
         )
     )
-    parser.add_argument(
-        "--approach",
-        type=str,
-        default="transformer",
-        choices=["tfidf", "lstm", "transformer"],
-        help=(
-            "The approach to use for the AutoML system. "
-            "Options are 'tfidf', 'lstm', or 'transformer'."
-        )
-    )
+
     parser.add_argument(
         "--vocab-size",
         type=int,
@@ -248,27 +232,6 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--lstm-emb-dim",
-        type=int,
-        default=64,
-        help="The embedding dimension to use for the LSTM model."
-    )
-
-    parser.add_argument(
-        "--lstm-hidden-dim",
-        type=int,
-        default=64,
-        help="The hidden size to use for the LSTM model."
-    )
-
-    parser.add_argument(
-        "--ffnn-hidden-layer-dim",
-        type=int,
-        default=64,
-        help="The hidden size to use for the model."
-    )
-
-    parser.add_argument(
         "--data-fraction",
         type=float,
         default=1,
@@ -298,16 +261,12 @@ if __name__ == "__main__":
         output_path=Path(args.output_path).absolute(),
         data_path=Path(args.data_path).absolute(),
         seed=args.seed,
-        approach=args.approach,
         vocab_size=args.vocab_size,
         token_length=args.token_length,
         epochs=args.epochs,
         batch_size=args.batch_size,
         lr=args.lr,
         weight_decay=args.weight_decay,
-        ffnn_hidden=args.ffnn_hidden_layer_dim,
-        lstm_emb_dim=args.lstm_emb_dim,
-        lstm_hidden_dim=args.lstm_hidden_dim,
         data_fraction=args.data_fraction,
         load_path=Path(args.load_path) if args.load_path is not None else None
     )

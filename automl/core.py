@@ -26,16 +26,12 @@ class TextAutoML:
     def __init__(
         self,
         seed=42,
-        approach='auto',
-        vocab_size=10000,
+        vocab_size=10000, # Right now does nothing since we use a autotokenizer and use its vocab size
         token_length=128,
         epochs=5,
         batch_size=64,
         lr=1e-4,
         weight_decay=0.0,
-        ffnn_hidden=128,
-        lstm_emb_dim=128,
-        lstm_hidden_dim=128,
         fraction_layers_to_finetune: float=1.0,
     ):
         self.seed = seed
@@ -44,7 +40,6 @@ class TextAutoML:
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(self.device)
-        self.approach = approach
         self.vocab_size = vocab_size
         self.token_length = token_length
         self.epochs = epochs
@@ -52,9 +47,6 @@ class TextAutoML:
         self.lr = lr
         self.weight_decay = weight_decay
 
-        self.ffnn_hidden = ffnn_hidden
-        self.lstm_emb_dim = lstm_emb_dim
-        self.lstm_hidden_dim = lstm_hidden_dim
         self.fraction_layers_to_finetune = fraction_layers_to_finetune
 
         self.model = None
@@ -71,19 +63,15 @@ class TextAutoML:
         train_df: pd.DataFrame,
         val_df: pd.DataFrame,
         num_classes: int,
-        approach=None,
         vocab_size=None,
         token_length=None,
         epochs=None,
         batch_size=None,
         lr=None,
         weight_decay=None,
-        ffnn_hidden=None,
-        lstm_emb_dim=None,
-        lstm_hidden_dim=None,
-        fraction_layers_to_finetune=None,
         load_path: Path=None,
         save_path: Path=None,
+        fraction_layers_to_finetune: float=1.0
     ):
         """
         Fits a model to the given dataset.
@@ -93,27 +81,19 @@ class TextAutoML:
         - val_df (pd.DataFrame): Validation data with 'text' and 'label' columns.
         - num_classes (int): Number of classes in the dataset.
         - seed (int): Random seed for reproducibility.
-        - approach (str): Model type - 'tfidf', 'lstm', or 'transformer'. Default is 'auto'.
         - vocab_size (int): Maximum vocabulary size.
         - token_length (int): Maximum token sequence length.
         - epochs (int): Number of training epochs.
         - batch_size (int): Batch size for training.
         - lr (float): Learning rate.
         - weight_decay (float): Weight decay for optimizer.
-        - ffnn_hidden (int): Hidden dimension size for FFNN.
-        - lstm_emb_dim (int): Embedding dimension size for LSTM.
-        - lstm_hidden_dim (int): Hidden dimension size for LSTM.
         """
-        if approach is not None: self.approach = approach
         if vocab_size is not None: self.vocab_size = vocab_size
         if token_length is not None: self.token_length = token_length
         if epochs is not None: self.epochs = epochs
         if batch_size is not None: self.batch_size = batch_size
         if lr is not None: self.lr = lr
         if weight_decay is not None: self.weight_decay = weight_decay
-        if ffnn_hidden is not None: self.ffnn_hidden = ffnn_hidden
-        if lstm_emb_dim is not None: self.lstm_emb_dim = lstm_emb_dim
-        if lstm_hidden_dim is not None: self.lstm_hidden_dim = lstm_hidden_dim
         if fraction_layers_to_finetune is not None: self.fraction_layers_to_finetune = fraction_layers_to_finetune
         
         logger.info("Loading and preparing data...")
@@ -127,73 +107,31 @@ class TextAutoML:
         logger.info(f"Val class distribution: {Counter(self.val_labels)}")
 
         dataset = None
-        if self.approach == 'tfidf':
-            self.vectorizer = TfidfVectorizer(
-                max_features=self.vocab_size,
-                lowercase=True,
-                min_df=2,    # ignore words appearing in less than 2 sentences
-                max_df=0.8,  # ignore words appearing in > 80% of sentences
-                sublinear_tf=True,  # use log-spaced term-frequency scoring
-            )
-            X = self.vectorizer.fit_transform(self.train_texts).toarray()
-            dataset = torch.utils.data.TensorDataset(
-                torch.tensor(X, dtype=torch.float32),
-                torch.tensor(self.train_labels)
-            )
-            # models and dataloaders
-            train_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
-            X = self.vectorizer.transform(self.val_texts).toarray()
-            _dataset = torch.utils.data.TensorDataset(
-                torch.tensor(X, dtype=torch.float32),
-                torch.tensor(self.val_labels)
-            )
-            val_loader = DataLoader(_dataset, batch_size=self.batch_size, shuffle=True)
-            self.model = SimpleFFNN(
-                X.shape[1], hidden=self.ffnn_hidden, output_dim=self.num_classes
-            )
 
-        elif self.approach in ['lstm', 'transformer']:
-            model_name = 'distilbert-base-uncased'
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.vocab_size = self.tokenizer.vocab_size
-            dataset = SimpleTextDataset(
-                self.train_texts, self.train_labels, self.tokenizer, self.token_length
-            )
-            train_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
-            _dataset = SimpleTextDataset(
-                self.val_texts, self.val_labels, self.tokenizer, self.token_length
-            )
-            val_loader = DataLoader(_dataset, batch_size=self.batch_size, shuffle=True)
+        model_name = 'distilbert-base-uncased'
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.vocab_size = self.tokenizer.vocab_size
+        dataset = SimpleTextDataset(
+            self.train_texts, self.train_labels, self.tokenizer, self.token_length
+        )
+        train_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+        _dataset = SimpleTextDataset(
+            self.val_texts, self.val_labels, self.tokenizer, self.token_length
+        )
+        val_loader = DataLoader(_dataset, batch_size=self.batch_size, shuffle=True)
 
-            match self.approach:
-                case "lstm":
-                    self.model = LSTMClassifier(
-                        len(self.tokenizer),
-                        self.lstm_emb_dim,
-                        self.lstm_hidden_dim,
-                        self.num_classes
-                    )
-                case "transformer":
-                    if TRANSFORMERS_AVAILABLE:
-                        self.model = AutoModelForSequenceClassification.from_pretrained(
-                            model_name, 
-                            num_labels=self.num_classes
-                        )
-                        freeze_layers(self.model, self.fraction_layers_to_finetune)  
-                    else:
-                        raise ValueError(
-                            "Need `AutoTokenizer`, `AutoModelForSequenceClassification` "
-                            "from `transformers` package."
-                        )
-                case _:
-                    raise ValueError("Unsupported approach or missing transformers.")
-                
-        elif self.approach == "transfer-learning":
-
+        if TRANSFORMERS_AVAILABLE:
+            self.model = AutoModelForSequenceClassification.from_pretrained(
+                model_name, 
+                num_labels=self.num_classes
+            )
+            freeze_layers(self.model, self.fraction_layers_to_finetune)  
         else:
-            raise ValueError(f"Unrecognized approach: {self.approach}")
-        
-
+            raise ValueError(
+                "Need `AutoTokenizer`, `AutoModelForSequenceClassification` "
+                "from `transformers` package."
+            )
+       
         # Training and validating
         self.model.to(self.device)
         assert dataset is not None, f"`dataset` cannot be None here!"
@@ -294,20 +232,6 @@ class TextAutoML:
                     inputs = {k: v.to(self.device) for k, v in batch.items() if k != 'labels'}
                     outputs = self.model(**inputs).logits
                     labels.extend(batch["labels"])
-                else:
-                    match self.approach:
-                        case "tfidf":
-                            x, y = batch[0].to(self.device), batch[1].to(self.device)
-                            outputs = self.model(x)
-                            labels.extend(y)
-                        case "lstm" | "transformer":
-                            inputs = {k: v.to(self.device) for k, v in batch.items()}
-                            outputs = self.model(**inputs)
-                            outputs = outputs.logits if self.approach == "transformer" else outputs
-                            labels.extend(inputs["labels"])
-                        case _:
-                            raise ValueError("Oops! Wrong approach.")
-                            
                 preds.extend(torch.argmax(outputs, dim=1).cpu().numpy())
         
         if isinstance(preds, list):
@@ -326,26 +250,14 @@ class TextAutoML:
         if isinstance(test_data, DataLoader):
             return self._predict(test_data)
         
-        if self.approach == 'tfidf':
-            _X = self.vectorizer.transform(test_data['text'].tolist()).toarray()
-            _labels = test_data['label'].tolist()
-            _dataset = torch.utils.data.TensorDataset(
-                torch.tensor(_X, dtype=torch.float32),
-                torch.tensor(_labels)
-            )
-            _loader = DataLoader(_dataset, batch_size=self.batch_size, shuffle=True)
-        elif self.approach in ['lstm', 'transformer']:
-            _dataset = SimpleTextDataset(
-                test_data['text'].tolist(),
-                test_data['label'].tolist(),
-                self.tokenizer,
-                self.token_length
-            )
-            _loader = DataLoader(_dataset, batch_size=self.batch_size, shuffle=True)
-        else:
-            raise ValueError(f"Unrecognized approach: {self.approach}")
-            # handling any possible tokenization
-        
+        _dataset = SimpleTextDataset(
+            test_data['text'].tolist(),
+            test_data['label'].tolist(),
+            self.tokenizer,
+            self.token_length
+        )
+        _loader = DataLoader(_dataset, batch_size=self.batch_size, shuffle=True)
+
         return self._predict(_loader)
 
 
