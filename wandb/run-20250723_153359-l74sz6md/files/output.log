@@ -1,0 +1,31 @@
+Fitting Text AutoML
+train_df after split, original class counts label
+2    15794
+1     2254
+0     1940
+Name: count, dtype: int64 <class 'pandas.core.series.Series'>
+train_df before split, original class counts np [15794  2254  1940] <class 'numpy.ndarray'>
+class weights [ 1.26554388  8.86779059 10.30309278] <class 'numpy.ndarray'>
+normalized class weights [0.18577766 1.30176236 1.51245998] <class 'numpy.ndarray'>
+Train size: 19988, Validation size: 4997, Test size: 12141
+[34m[1mwandb[0m: [32m[41mERROR[0m Attempted to change value of key "val_size" from 0.2 to 4997
+[34m[1mwandb[0m: [32m[41mERROR[0m If you really want to do this, pass allow_val_change=True to config.update()
+Traceback (most recent call last):
+  File "/work/dlclarge2/celikh-nr1-ayca/miniconda3/envs/automl/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/work/dlclarge2/celikh-nr1-ayca/miniconda3/envs/automl/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/work/dlclarge2/celikh-nr1-ayca/AutoML-Final_Project/run.py", line 294, in <module>
+    main_loop(
+  File "/work/dlclarge2/celikh-nr1-ayca/AutoML-Final_Project/run.py", line 114, in main_loop
+    wandb.config.update({
+  File "/work/dlclarge2/celikh-nr1-ayca/miniconda3/envs/automl/lib/python3.10/site-packages/wandb/sdk/wandb_config.py", line 187, in update
+    sanitized = self._update(d, allow_val_change)
+  File "/work/dlclarge2/celikh-nr1-ayca/miniconda3/envs/automl/lib/python3.10/site-packages/wandb/sdk/wandb_config.py", line 180, in _update
+    sanitized = self._sanitize_dict(
+  File "/work/dlclarge2/celikh-nr1-ayca/miniconda3/envs/automl/lib/python3.10/site-packages/wandb/sdk/wandb_config.py", line 267, in _sanitize_dict
+    k, v = self._sanitize(k, v, allow_val_change)
+  File "/work/dlclarge2/celikh-nr1-ayca/miniconda3/envs/automl/lib/python3.10/site-packages/wandb/sdk/wandb_config.py", line 288, in _sanitize
+    raise config_util.ConfigError(
+wandb.sdk.lib.config_util.ConfigError: Attempted to change value of key "val_size" from 0.2 to 4997
+If you really want to do this, pass allow_val_change=True to config.update()

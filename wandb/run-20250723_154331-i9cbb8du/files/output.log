@@ -1,0 +1,31 @@
+Fitting Text AutoML
+train_df after split, original class counts label
+2    15794
+1     2254
+0     1940
+Name: count, dtype: int64
+train_df before split, original class counts np [15794  2254  1940]
+class weights [ 1.26554388  8.86779059 10.30309278] <class 'numpy.ndarray'>
+normalized class weights [0.18577766 1.30176236 1.51245998] <class 'numpy.ndarray'>
+Train size: 19988, Validation size: 4997, Test size: 12141
+cuda
+Loading and preparing data...
+Train class distribution: Counter({2: 15794, 1: 2254, 0: 1940})
+Val class distribution: Counter({2: 3948, 1: 564, 0: 485})
+Some weights of DistilBertForSequenceClassification were not initialized from the model checkpoint at distilbert-base-uncased and are newly initialized: ['classifier.bias', 'classifier.weight', 'pre_classifier.bias', 'pre_classifier.weight']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+Using class weights: tensor([0.1858, 1.3018, 1.5125], device='cuda:0')
+Traceback (most recent call last):
+  File "/work/dlclarge2/celikh-nr1-ayca/miniconda3/envs/automl/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/work/dlclarge2/celikh-nr1-ayca/miniconda3/envs/automl/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/work/dlclarge2/celikh-nr1-ayca/AutoML-Final_Project/run.py", line 294, in <module>
+    main_loop(
+  File "/work/dlclarge2/celikh-nr1-ayca/AutoML-Final_Project/run.py", line 135, in main_loop
+    # val_err = automl.fit(
+  File "/work/dlclarge2/celikh-nr1-ayca/AutoML-Final_Project/automl/core.py", line 146, in fit
+    val_acc = self._train_loop(
+  File "/work/dlclarge2/celikh-nr1-ayca/AutoML-Final_Project/automl/core.py", line 196, in _train_loop
+    total_loss += loss.item()
+KeyboardInterrupt

@@ -21,11 +21,10 @@ class BaseTextDataset(ABC):
         """Load train and test data."""
         pass
     
-    @abstractmethod
-    def get_num_classes(self) -> int:
+    def get_num_classes(self, train_df) -> int:
         """Return number of classes."""
-        pass
-    
+        return train_df['label'].nunique()
+
     def preprocess_text(self, text: str) -> str:
         """Basic text preprocessing."""
         # Convert to lowercase
@@ -39,11 +38,39 @@ class BaseTextDataset(ABC):
     def create_dataloaders(
         self,
         val_size: float = 0.2,
-        random_state: int = 42
+        random_state: int = 42,
+        set_class_count_min: bool = False,
+        use_class_weights: bool = True
     ) -> Dict[str, Any]:
         """Create train/validation/test dataloaders and preprocessing objects."""
         train_df, test_df = self.load_data()  # not implemented in base class `BaseTextDataset`
+        label_column = train_df.columns[1]
+        print("Train_df with labels and class instance counts:\n",train_df[label_column].value_counts())
         
+        if set_class_count_min and use_class_weights:
+            raise ValueError("Cannot set class count to minimum and use class weights at the same time. Or neither of them.")
+        
+        if set_class_count_min:
+            # get class counts, sort by label from 0 to 
+            label_column = train_df.columns[1]
+            class_counts = self.get_num_classes(train_df)
+            print("train_df before split, original class counts", class_counts)
+            
+            class_instance_counts = train_df[label_column].value_counts().sort_index().to_numpy()
+            print("train_df before split, original class counts", class_counts)
+            
+            # find the minimum number of instances in any class
+            min_class_count = class_instance_counts.min()
+
+            # Subsample each class to the minimum class count
+            subsampled_dfs = []
+            for label, group in train_df.groupby(label_column):
+                subsampled = group.sample(n=min_class_count, random_state=random_state)
+                subsampled_dfs.append(subsampled)
+            train_df = pd.concat(subsampled_dfs)
+            print(f"New dataset length: {len(train_df)}")
+            print(train_df[label_column].value_counts())
+
         # Split training data into train/validation
         if val_size > 0:
             train_df, val_df = train_test_split(
@@ -52,26 +79,41 @@ class BaseTextDataset(ABC):
             )
         else:
             val_df = None
+
+        if use_class_weights:
+            # how many classes are there? find the 
+            label_column = train_df.columns[1]
+            class_counts = self.get_num_classes(train_df)
+            print("train_df after split, original class counts", class_counts)
+            
+            class_instance_counts = train_df[label_column].value_counts().sort_index().to_numpy()
+            print("train_df after split, original class counts", class_instance_counts)
+            
+            # Calculate class weights
+            # for each class do total instances / instances for that class
+            total_instances = len(train_df)
+            class_weights = total_instances / class_instance_counts
+            print("class weights", class_weights, type(class_weights))
+            normalized_class_weights = class_weights * (len(class_instance_counts) / np.sum(class_weights))
+            print("normalized class weights", normalized_class_weights, type(normalized_class_weights))
         
         # Preprocess text
         train_df['text'] = train_df['text'].apply(self.preprocess_text)
         if val_df is not None:
             val_df['text'] = val_df['text'].apply(self.preprocess_text)
         test_df['text'] = test_df['text'].apply(self.preprocess_text)
-        
+
         return {
             'train_df': train_df,
             'val_df': val_df,
             'test_df': test_df,
-            'num_classes': self.get_num_classes()
+            "num_classes": self.get_num_classes(train_df),
+            "normalized_class_weights": normalized_class_weights if use_class_weights else None
         }
 
 
 class AGNewsDataset(BaseTextDataset):
     """AG News dataset for news categorization (4 classes)."""
-    
-    def get_num_classes(self) -> int:
-        return 4
     
     def load_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Load AG News data."""
@@ -91,9 +133,6 @@ class AGNewsDataset(BaseTextDataset):
 class IMDBDataset(BaseTextDataset):
     """IMDB movie review sentiment dataset (2 classes)."""
     
-    def get_num_classes(self) -> int:
-        return 2
-    
     def load_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Load IMDB data."""
         train_path = self.data_path / "imdb" / "train.csv"
@@ -109,10 +148,7 @@ class IMDBDataset(BaseTextDataset):
 
 
 class AmazonReviewsDataset(BaseTextDataset):
-    """Amazon product reviews dataset (5 classes for categories)."""
-    
-    def get_num_classes(self) -> int:
-        return 5
+    """Amazon product reviews dataset (3 classes)."""
     
     def load_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Load Amazon reviews data."""
@@ -131,9 +167,6 @@ class AmazonReviewsDataset(BaseTextDataset):
 class DBpediaDataset(BaseTextDataset):
     """DBpedia ontology classification dataset (14 classes)."""
     
-    def get_num_classes(self) -> int:
-        return 14
-    
     def load_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Load DBpedia ontology data."""
         train_path = self.data_path / "dbpedia" / "train.csv"
@@ -146,8 +179,9 @@ class DBpediaDataset(BaseTextDataset):
             raise FileNotFoundError(f"Data files not found at {train_path}, generating dummy data...")
 
         # Crucial handling of negative class label
-        train_df['label'] = train_df['label'].replace(-1, self.get_num_classes() - 1)
-        test_df['label'] = test_df['label'].replace(-1, self.get_num_classes() - 1)
+        class_num = self.get_num_classes(train_df)
+        train_df['label'] = train_df['label'].replace(-1, class_num - 1)
+        test_df['label'] = test_df['label'].replace(-1, class_num - 1)
 
         return train_df, test_df
 

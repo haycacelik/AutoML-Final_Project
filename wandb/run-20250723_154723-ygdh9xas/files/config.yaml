@@ -1,0 +1,141 @@
+_wandb:
+    value:
+        cli_version: 0.21.0
+        e:
+            xtrfw8s5sjwq3hwjjbjo9tss9nbupow5:
+                args:
+                    - --dataset
+                    - amazon
+                    - --epochs
+                    - "3"
+                cpu_count: 32
+                cpu_count_logical: 64
+                cudaVersion: "12.8"
+                disk:
+                    /:
+                        total: "1878767386624"
+                        used: "119101153280"
+                email: aycacelikaccs@gmail.com
+                executable: /work/dlclarge2/celikh-nr1-ayca/miniconda3/envs/automl/bin/python
+                git:
+                    commit: e2bcfc4fa1cd65f5ca3e15bf159e09225c0f5ce8
+                    remote: https://github.com/haycacelik/AutoML-Final_Project.git
+                gpu: NVIDIA GeForce RTX 2080 Ti
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Turing
+                      cudaCores: 4352
+                      memoryTotal: "11811160064"
+                      name: NVIDIA GeForce RTX 2080 Ti
+                      uuid: GPU-402c80a6-2d45-1ba8-73f4-a3a9f0821eed
+                host: dlcgpu13
+                memory:
+                    total: "540673675264"
+                os: Linux-6.8.0-64-generic-x86_64-with-glibc2.35
+                program: -m run
+                python: CPython 3.10.18
+                root: /work/dlclarge2/celikh-nr1-ayca/AutoML-Final_Project
+                slurm:
+                    cluster_name: kislurm3
+                    conf: /var/spool/slurm/conf-cache/slurm.conf
+                    cpu_bind: verbose,mask_cpu:0x0082030000820300
+                    cpu_bind_list: "0x0082030000820300"
+                    cpu_bind_type: 'mask_cpu:'
+                    cpu_bind_verbose: verbose
+                    cpus_on_node: "8"
+                    gpus_on_node: "1"
+                    gpus_per_node: "1"
+                    gtids: "0"
+                    job_account: lecture
+                    job_cpus_per_node: "8"
+                    job_end_time: "1753288988"
+                    job_gid: "1026"
+                    job_group: student
+                    job_id: "20253986"
+                    job_name: bash
+                    job_nodelist: dlcgpu13
+                    job_num_nodes: "1"
+                    job_partition: dllabdlc_gpu-rtx2080
+                    job_qos: normal
+                    job_start_time: "1753274588"
+                    job_uid: "20698"
+                    job_user: celikh
+                    jobid: "20253986"
+                    launch_node_ipaddr: 10.5.166.214
+                    localid: "0"
+                    nnodes: "1"
+                    nodeid: "0"
+                    nodelist: dlcgpu13
+                    nprocs: "1"
+                    ntasks: "1"
+                    prio_process: "0"
+                    procid: "0"
+                    pty_port: "41471"
+                    pty_win_col: "133"
+                    pty_win_row: "15"
+                    script_context: prolog_task
+                    srun_comm_host: 10.5.166.214
+                    srun_comm_port: "34865"
+                    step_gpus: "2"
+                    step_id: "0"
+                    step_launcher_port: "34865"
+                    step_nodelist: dlcgpu13
+                    step_num_nodes: "1"
+                    step_num_tasks: "1"
+                    step_tasks_per_node: "1"
+                    stepid: "0"
+                    submit_dir: /work/dlclarge2/celikh-nr1-ayca
+                    submit_host: kis3bat1
+                    task_pid: "1417974"
+                    tasks_per_node: "1"
+                    topology_addr: .switch-ms2-r3s9-uplink.switch-ms2-r3s10.dlcgpu13
+                    topology_addr_pattern: switch.switch.switch.node
+                    umask: "0022"
+                startedAt: "2025-07-23T13:47:23.761331Z"
+                writerId: xtrfw8s5sjwq3hwjjbjo9tss9nbupow5
+        m: []
+        python_version: 3.10.18
+        t:
+            "1":
+                - 1
+                - 5
+                - 11
+                - 49
+                - 53
+            "2":
+                - 1
+                - 5
+                - 11
+                - 49
+                - 53
+            "3":
+                - 13
+                - 15
+                - 16
+            "4": 3.10.18
+            "5": 0.21.0
+            "6": 4.53.3
+            "12": 0.21.0
+            "13": linux-x86_64
+batch_size:
+    value: 32
+data_fraction:
+    value: 1
+dataset:
+    value: amazon
+epochs:
+    value: 3
+fraction_layers_to_finetune:
+    value: 1
+lr:
+    value: 0.01
+seed:
+    value: 42
+token_length:
+    value: 128
+val_percentage:
+    value: 0.2
+vocab_size:
+    value: 1000
+weight_decay:
+    value: 0.01

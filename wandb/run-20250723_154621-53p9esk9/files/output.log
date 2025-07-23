@@ -1,0 +1,19 @@
+Fitting Text AutoML
+train_df after split, original class counts 3
+train_df before split, original class counts np label
+0     1940
+1     2254
+2    15794
+Name: count, dtype: int64
+Traceback (most recent call last):
+  File "/work/dlclarge2/celikh-nr1-ayca/miniconda3/envs/automl/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/work/dlclarge2/celikh-nr1-ayca/miniconda3/envs/automl/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/work/dlclarge2/celikh-nr1-ayca/AutoML-Final_Project/run.py", line 294, in <module>
+    main_loop(
+  File "/work/dlclarge2/celikh-nr1-ayca/AutoML-Final_Project/run.py", line 93, in main_loop
+    data_info = dataset_class(data_path).create_dataloaders(val_size=val_size, random_state=seed, use_class_weights = True)
+  File "/work/dlclarge2/celikh-nr1-ayca/AutoML-Final_Project/automl/datasets.py", line 95, in create_dataloaders
+    class_weights = total_instances / class_counts_np
+UnboundLocalError: local variable 'class_counts_np' referenced before assignment

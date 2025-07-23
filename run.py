@@ -56,7 +56,7 @@ def main_loop(
         config={
             "dataset": dataset,
             "seed": seed,
-            "val_size": val_size,
+            "val_percentage": val_size,
             "vocab_size": vocab_size,
             "token_length": token_length,
             "epochs": epochs,
@@ -90,23 +90,25 @@ def main_loop(
 
     # Get the dataset and create dataloaders
     data_path = Path(data_path) if isinstance(data_path, str) else data_path
-    data_info = dataset_class(data_path).create_dataloaders(val_size=val_size, random_state=seed)
+    data_info = dataset_class(data_path).create_dataloaders(val_size=val_size, random_state=seed, use_class_weights = True)
 
     train_df = data_info['train_df']
-    
-    _subsample = np.random.choice(
-        list(range(len(train_df))),
-        size=int(data_fraction * len(train_df)),
-        replace=False,
-    )
-    train_df = train_df.iloc[_subsample]
-    
     val_df = data_info.get('val_df', None)
     test_df = data_info['test_df']
-    num_classes = data_info['num_classes']
+    num_classes = data_info["num_classes"]
+    if data_info["normalized_class_weights"] is not None:
+        normalized_class_weights = data_info["normalized_class_weights"]
+    
+    # if i want to use like 0.5 so half of the data i can do it here, useful for succesive halving
+    if data_fraction < 1:
+        _subsample = np.random.choice(
+            list(range(len(train_df))),
+            size=int(data_fraction * len(train_df)),
+            replace=False,
+        )
+        train_df = train_df.iloc[_subsample]
     
     print(f"Train size: {len(train_df)}, Validation size: {len(val_df)}, Test size: {len(test_df)}")
-    print(f"Number of classes: {num_classes}")
     
     # Update wandb config with dataset info
     wandb.config.update({
@@ -114,10 +116,11 @@ def main_loop(
         "val_size": len(val_df) if val_df is not None else 0,
         "test_size": len(test_df),
         "num_classes": num_classes
-    })
+    }, allow_val_change=True)
 
     # Initialize the TextAutoML instance with the best parameters
     automl = TextAutoML(
+        normalized_class_weights=normalized_class_weights,
         seed=seed,
         vocab_size=vocab_size,
         token_length=token_length,

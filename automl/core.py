@@ -21,6 +21,7 @@ except ImportError:
 class TextAutoML:
     def __init__(
         self,
+        normalized_class_weights = None,
         seed=42,
         vocab_size=10000, # Right now does nothing since we use a autotokenizer and use its vocab size
         token_length=128,
@@ -42,6 +43,7 @@ class TextAutoML:
         self.batch_size = batch_size
         self.lr = lr
         self.weight_decay = weight_decay
+        self.normalized_class_weights = normalized_class_weights
 
         self.fraction_layers_to_finetune = fraction_layers_to_finetune
 
@@ -91,7 +93,6 @@ class TextAutoML:
         if lr is not None: self.lr = lr
         if weight_decay is not None: self.weight_decay = weight_decay
         if fraction_layers_to_finetune is not None: self.fraction_layers_to_finetune = fraction_layers_to_finetune
-        
         print("Loading and preparing data...")
 
         self.train_texts = train_df['text'].tolist()
@@ -107,7 +108,7 @@ class TextAutoML:
         
         # Log class distributions to wandb if wandb is initialized
         if wandb.run is not None:
-            wandb.log({
+            wandb.config.update({
                 "train_class_distribution": dict(train_dist),
                 "val_class_distribution": dict(val_dist)
             })
@@ -159,7 +160,13 @@ class TextAutoML:
         save_path: Path=None,
     ):
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
-        criterion = nn.CrossEntropyLoss()
+        
+        if self.normalized_class_weights is not None:
+            class_weights = torch.tensor(self.normalized_class_weights, dtype=torch.float).to(self.device)
+            criterion = nn.CrossEntropyLoss(weight=class_weights)
+            print(f"Using class weights: {class_weights}")
+        else:
+            criterion = nn.CrossEntropyLoss()
 
         start_epoch = 0
         # handling checkpoint resume
@@ -284,6 +291,7 @@ class TextAutoML:
 
 
 def freeze_layers(model, fraction_layers_to_finetune: float=1.0) -> None:
+    # if the value is 1.0, then do not freeze any layers
     total_layers = len(model.distilbert.transformer.layer)
     _num_layers_to_finetune = int(fraction_layers_to_finetune * total_layers)
     layers_to_freeze = total_layers - _num_layers_to_finetune

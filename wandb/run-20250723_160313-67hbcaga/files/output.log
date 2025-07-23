@@ -1,0 +1,13 @@
+Fitting Text AutoML
+Traceback (most recent call last):
+  File "/work/dlclarge2/celikh-nr1-ayca/miniconda3/envs/automl/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/work/dlclarge2/celikh-nr1-ayca/miniconda3/envs/automl/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/work/dlclarge2/celikh-nr1-ayca/AutoML-Final_Project/run.py", line 294, in <module>
+    main_loop(
+  File "/work/dlclarge2/celikh-nr1-ayca/AutoML-Final_Project/run.py", line 93, in main_loop
+    data_info = dataset_class(data_path).create_dataloaders(val_size=val_size, random_state=seed, use_class_weights = True)
+  File "/work/dlclarge2/celikh-nr1-ayca/AutoML-Final_Project/automl/datasets.py", line 47, in create_dataloaders
+    print("Train_df with labels and class instance counts:\n",{train_df['label'].value_counts()})
+TypeError: unhashable type: 'Series'

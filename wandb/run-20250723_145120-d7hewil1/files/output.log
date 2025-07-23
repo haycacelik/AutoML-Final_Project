@@ -1,0 +1,13 @@
+Fitting Text AutoML
+Setting class count to minimum for balanced dataset
+original class counts label
+2    19742
+1     2818
+0     2425
+Name: count, dtype: int64 <class 'pandas.core.series.Series'>
+New dataset length: 7275
+label
+0    2425
+1    2425
+2    2425
+Name: count, dtype: int64
