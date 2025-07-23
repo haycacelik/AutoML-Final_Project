@@ -3,7 +3,6 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
-from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from automl.utils import SimpleTextDataset
@@ -44,8 +43,13 @@ class TextAutoML:
         self.lr = lr
         self.weight_decay = weight_decay
         self.normalized_class_weights = normalized_class_weights
-
         self.fraction_layers_to_finetune = fraction_layers_to_finetune
+
+        print("learning rate")
+        print(self.lr)
+        print("fraction layers to finetune")
+        print(self.fraction_layers_to_finetune)
+
 
         self.model = None
         self.tokenizer = None
@@ -93,25 +97,13 @@ class TextAutoML:
         if lr is not None: self.lr = lr
         if weight_decay is not None: self.weight_decay = weight_decay
         if fraction_layers_to_finetune is not None: self.fraction_layers_to_finetune = fraction_layers_to_finetune
-        print("Loading and preparing data...")
+        print("---Loading and preparing data...")
 
         self.train_texts = train_df['text'].tolist()
         self.train_labels = train_df['label'].tolist()
         self.val_texts = val_df['text'].tolist()
         self.val_labels = val_df['label'].tolist()
         self.num_classes = num_classes
-        
-        train_dist = Counter(self.train_labels)
-        val_dist = Counter(self.val_labels)
-        print(f"Train class distribution: {train_dist}")
-        print(f"Val class distribution: {val_dist}")
-        
-        # Log class distributions to wandb if wandb is initialized
-        if wandb.run is not None:
-            wandb.config.update({
-                "train_class_distribution": dict(train_dist),
-                "val_class_distribution": dict(val_dist)
-            })
 
         dataset = None
 
@@ -122,6 +114,11 @@ class TextAutoML:
             self.train_texts, self.train_labels, self.tokenizer, self.token_length
         )
         train_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+        for batch in train_loader:
+            print(batch.keys())
+            print(batch['input_ids'].shape)
+            print(batch['labels'])  # Check type and values
+            break
         _dataset = SimpleTextDataset(
             self.val_texts, self.val_labels, self.tokenizer, self.token_length
         )
@@ -164,7 +161,7 @@ class TextAutoML:
         if self.normalized_class_weights is not None:
             class_weights = torch.tensor(self.normalized_class_weights, dtype=torch.float).to(self.device)
             criterion = nn.CrossEntropyLoss(weight=class_weights)
-            print(f"Using class weights: {class_weights}")
+            print(f"---Using class weights: {class_weights}")
         else:
             criterion = nn.CrossEntropyLoss()
 
@@ -175,7 +172,7 @@ class TextAutoML:
             self.model.load_state_dict(_states["model_state_dict"])
             optimizer.load_state_dict(_states["optimizer_state_dict"])
             start_epoch = _states["epoch"]
-            print(f"Resuming from checkpoint at {start_epoch}")
+            print(f"---Resuming from checkpoint at {start_epoch}")
 
         for epoch in range(start_epoch, self.epochs):            
             total_loss = 0
@@ -186,7 +183,6 @@ class TextAutoML:
                 self.model.train()
                 optimizer.zero_grad()
 
-                # if isinstance(batch, dict):
                 inputs = {k: v.to(self.device) for k, v in batch.items()}
                 outputs = self.model(**inputs)
                 loss = outputs.loss
@@ -204,7 +200,7 @@ class TextAutoML:
             # Calculate training accuracy
             train_acc = accuracy_score(train_labels_list, train_preds)
             
-            print(f"Epoch {epoch + 1}, Loss: {total_loss:.4f}, Train Accuracy: {train_acc:.4f}")
+            print(f"---Epoch {epoch + 1}, Loss: {total_loss:.4f}, Train Accuracy: {train_acc:.4f}")
             
             # Log training metrics to wandb
             if wandb.run is not None:
@@ -217,7 +213,7 @@ class TextAutoML:
             if self.val_texts:
                 val_preds, val_labels = self._predict(val_loader)
                 val_acc = accuracy_score(val_labels, val_preds)
-                print(f"Epoch {epoch + 1}, Validation Accuracy: {val_acc:.4f}")
+                print(f"---Epoch {epoch + 1}, Validation Accuracy: {val_acc:.4f}")
                 
                 # Log validation accuracy to wandb
                 if wandb.run is not None:
@@ -229,7 +225,7 @@ class TextAutoML:
         if self.val_texts:
             val_preds, val_labels = self._predict(val_loader)
             val_acc = accuracy_score(val_labels, val_preds)
-            print(f"Final Validation Accuracy: {val_acc:.4f}")
+            print(f"---Final Validation Accuracy: {val_acc:.4f}")
             
             # Log final validation accuracy
             if wandb.run is not None:
@@ -274,7 +270,7 @@ class TextAutoML:
     def predict(self, test_data: pd.DataFrame | DataLoader) -> Tuple[np.ndarray, np.ndarray]:
 
         assert isinstance(test_data, DataLoader) or isinstance(test_data, pd.DataFrame), \
-            f"Input data type: {type(test_data)}; Expected: pd.DataFrame | DataLoader"
+            f"---Input data type: {type(test_data)}; Expected: pd.DataFrame | DataLoader"
 
         if isinstance(test_data, DataLoader):
             return self._predict(test_data)

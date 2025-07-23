@@ -1,9 +1,0 @@
-Fitting Text AutoML
-original class counts label
-2    19742
-1     2818
-0     2425
-Name: count, dtype: int64 <class 'pandas.core.series.Series'>
-original class counts np [19742  2818  2425] <class 'numpy.ndarray'>
-class weights [ 1.26557593  8.86621718 10.30309278] <class 'numpy.ndarray'>
-normalized class weights [0.18579638 1.30162956 1.51257406] <class 'numpy.ndarray'>

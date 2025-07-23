@@ -11,15 +11,9 @@ from pathlib import Path
 from typing import Tuple
 from collections import Counter
 import wandb
+import optuna
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-try:
-    from transformers import AutoTokenizer, AutoModelForSequenceClassification
-    import optuna
-    TRANSFORMERS_AVAILABLE = True
-    OPTUNA_AVAILABLE = True
-except ImportError:
-    TRANSFORMERS_AVAILABLE = False
-    OPTUNA_AVAILABLE = False
 
 
 class CustomClassificationHead(nn.Module):
@@ -84,7 +78,7 @@ class TextAutoML:
         token_length=128,
         epochs=5,
         batch_size=64,
-        lr=1e-4,
+        lr=1e-3,
         weight_decay=0.0,
         fraction_layers_to_finetune: float=1.0,
         use_custom_head=False,
@@ -192,35 +186,30 @@ class TextAutoML:
         )
         val_loader = DataLoader(_dataset, batch_size=self.batch_size, shuffle=True)
 
-        if TRANSFORMERS_AVAILABLE:
-            if self.use_custom_head:
-                # Load base model without classification head
-                from transformers import AutoModel
-                self.base_model = AutoModel.from_pretrained(model_name)
-                
-                # Create custom classification head
-                hidden_size = self.base_model.config.hidden_size
-                self.custom_head = CustomClassificationHead(
-                    hidden_size=hidden_size,
-                    num_classes=self.num_classes,
-                    dropout_rate=self.head_dropout_rate,
-                    num_hidden_layers=self.head_hidden_layers,
-                    hidden_dim=self.head_hidden_dim
-                )
-                
-                # Combine base model and custom head
-                self.model = DistilBertWithCustomHead(self.base_model, self.custom_head)
-            else:
-                self.model = AutoModelForSequenceClassification.from_pretrained(
-                    model_name, 
-                    num_labels=self.num_classes
-                )
-            freeze_layers(self.model, self.fraction_layers_to_finetune)  
-        else:
-            raise ValueError(
-                "Need `AutoTokenizer`, `AutoModelForSequenceClassification` "
-                "from `transformers` package."
+        if self.use_custom_head:
+            # Load base model without classification head
+            from transformers import AutoModel
+            self.base_model = AutoModel.from_pretrained(model_name)
+            
+            # Create custom classification head
+            hidden_size = self.base_model.config.hidden_size
+            self.custom_head = CustomClassificationHead(
+                hidden_size=hidden_size,
+                num_classes=self.num_classes,
+                dropout_rate=self.head_dropout_rate,
+                num_hidden_layers=self.head_hidden_layers,
+                hidden_dim=self.head_hidden_dim
             )
+            
+            # Combine base model and custom head
+            self.model = DistilBertWithCustomHead(self.base_model, self.custom_head)
+        else:
+            self.model = AutoModelForSequenceClassification.from_pretrained(
+                model_name, 
+                num_labels=self.num_classes
+            )
+        freeze_layers(self.model, self.fraction_layers_to_finetune)  
+
        
         # Training and validating
         self.model.to(self.device)
@@ -465,30 +454,3 @@ class TextAutoML:
             if hasattr(self, key):
                 setattr(self, key, value)
 
-
-def freeze_layers(model, fraction_layers_to_finetune: float=1.0) -> None:
-    """Freeze layers in the model based on fraction to finetune."""
-    # if the value is 1.0, then do not freeze any layers
-    
-    # Handle custom head model
-    if hasattr(model, 'distilbert') and hasattr(model.distilbert, 'transformer'):
-        transformer = model.distilbert.transformer
-    # Handle standard transformers model
-    elif hasattr(model, 'distilbert'):
-        transformer = model.distilbert.transformer
-    else:
-        print("Warning: Could not find transformer layers to freeze")
-        return
-    
-    total_layers = len(transformer.layer)
-    _num_layers_to_finetune = int(fraction_layers_to_finetune * total_layers)
-    layers_to_freeze = total_layers - _num_layers_to_finetune
-
-    print(f"Freezing {layers_to_freeze}/{total_layers} transformer layers")
-    
-    for layer in transformer.layer[:layers_to_freeze]:
-        for param in layer.parameters():
-            param.requires_grad = False
-
-
-# end of file

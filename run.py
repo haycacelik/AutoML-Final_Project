@@ -98,6 +98,8 @@ def main_loop(
     num_classes = data_info["num_classes"]
     if data_info["normalized_class_weights"] is not None:
         normalized_class_weights = data_info["normalized_class_weights"]
+    else:
+        normalized_class_weights = None
     
     # if i want to use like 0.5 so half of the data i can do it here, useful for succesive halving
     if data_fraction < 1:
@@ -120,7 +122,8 @@ def main_loop(
 
     # Initialize the TextAutoML instance with the best parameters
     automl = TextAutoML(
-        normalized_class_weights=normalized_class_weights,
+        # normalized_class_weights=normalized_class_weights,
+        normalized_class_weights=None,
         seed=seed,
         vocab_size=vocab_size,
         token_length=token_length,
@@ -188,121 +191,41 @@ def main_loop(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "--dataset",
-        type=str,
-        required=True,
-        help="The name of the dataset to run on.",
-        choices=["ag_news", "imdb", "amazon", "dbpedia",]
-    )
-    parser.add_argument(
-        "--output-path",
-        type=Path,
-        default=None,
-        help=(
-            "The path to save the predictions to."
-            " By default this will just save to the cwd as `./results`."
-        )
-    )
-    parser.add_argument(
-        "--load-path",
-        type=Path,
-        default=None,
-        help="The path to resume checkpoint from."
-    )
-    parser.add_argument(
-        "--data-path",
-        type=Path,
-        default=None,
-        help=(
-            "The path to laod the data from."
-            " By default this will look up cwd for `./.data/`."
-        )
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        help=(
-            "Random seed for reproducibility if you are using any randomness,"
-            " i.e. torch, numpy, pandas, sklearn, etc."
-        )
-    )
-
-    parser.add_argument(
-        "--vocab-size",
-        type=int,
-        default=1000,
-        help="The size of the vocabulary to use for the text dataset."
-    )
-    parser.add_argument(
-        "--token-length",
-        type=int,
-        default=128,
-        help="The maximum length of tokens to use for the text dataset."
-    )
-    parser.add_argument(
-        "--epochs",
-        type=int,
-        default=5,
-        help="The number of epochs to train the model for."
-    )
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=32,
-        help="The batch size to use for training and evaluation."
-    )
-    parser.add_argument(
-        "--lr",
-        type=float,
-        default=0.01,
-        help="The learning rate to use for the optimizer."
-    )
-    parser.add_argument(
-        "--weight-decay",
-        type=float,
-        default=0.01,
-        help="The weight decay to use for the optimizer."
-    )
-
-    parser.add_argument(
-        "--data-fraction",
-        type=float,
-        default=1,
-        help="Subsampling of training set, in fraction (0, 1]."
-    )
-    args = parser.parse_args()
-
-    print(f"Running text dataset {args.dataset}\n{args}")
-
-    if args.output_path is None:
-        args.output_path =  (
+    # Random seed for reproducibility if you are using any randomness,
+    # i.e. torch, numpy, pandas, sklearn, etc.
+    seed = 42
+    dataset = "imdb"
+    output_path =  (
             Path.cwd().absolute() / 
             "results" / 
-            f"dataset={args.dataset}" / 
-            f"seed={args.seed}"
+            f"dataset={dataset}" / 
+            f"seed={seed}"
         )
-    if args.data_path is None:
-        args.data_path = Path.cwd().absolute() / ".data"
-
-    args.output_path = Path(args.output_path).absolute()
-    args.output_path.mkdir(parents=True, exist_ok=True)
-
+    output_path = Path(output_path).absolute()
+    output_path.mkdir(parents=True, exist_ok=True)
+    data_path = Path.cwd().absolute() / ".data"
+    load_path = None
+    vocab_size = 1000
+    token_length = 128
+    epochs = 10
+    batch_size = 32
+    lr = 5e-6
+    weight_decay = 0.01
+    # "Subsampling of training set, in fraction (0, 1]. 1 is all the data"
+    data_fraction = 1.0
+    
     main_loop(
-        dataset=args.dataset,
-        output_path=Path(args.output_path).absolute(),
-        data_path=Path(args.data_path).absolute(),
-        seed=args.seed,
-        vocab_size=args.vocab_size,
-        token_length=args.token_length,
-        epochs=args.epochs,
-        batch_size=args.batch_size,
-        lr=args.lr,
-        weight_decay=args.weight_decay,
-        data_fraction=args.data_fraction,
-        load_path=Path(args.load_path) if args.load_path is not None else None
+        dataset=dataset,
+        output_path=Path(output_path).absolute(),
+        data_path=Path(data_path).absolute(),
+        seed=seed,
+        vocab_size=vocab_size,
+        token_length=token_length,
+        epochs=epochs,
+        batch_size=batch_size,
+        lr=lr,
+        weight_decay=weight_decay,
+        data_fraction=data_fraction,
+        load_path=Path(load_path) if load_path is not None else None
     )
 # end of file
