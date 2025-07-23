@@ -10,25 +10,20 @@ from pathlib import Path
 from typing import Tuple
 from collections import Counter
 import wandb
-
-try:
-    from transformers import AutoTokenizer, AutoModelForSequenceClassification
-    TRANSFORMERS_AVAILABLE = True
-except ImportError:
-    TRANSFORMERS_AVAILABLE = False
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 class TextAutoML:
     def __init__(
         self,
-        normalized_class_weights = None,
-        seed=42,
-        vocab_size=10000, # Right now does nothing since we use a autotokenizer and use its vocab size
-        token_length=128,
-        epochs=5,
-        batch_size=64,
-        lr=1e-4,
-        weight_decay=0.0,
-        fraction_layers_to_finetune: float=1.0,
+        normalized_class_weights,
+        seed,
+        vocab_size, # Right now does nothing since we use a autotokenizer and use its vocab size
+        token_length,
+        epochs,
+        batch_size,
+        lr,
+        weight_decay,
+        fraction_layers_to_finetune: float,
     ):
         self.seed = seed
         np.random.seed(seed)
@@ -124,18 +119,13 @@ class TextAutoML:
         )
         val_loader = DataLoader(_dataset, batch_size=self.batch_size, shuffle=True)
 
-        if TRANSFORMERS_AVAILABLE:
-            self.model = AutoModelForSequenceClassification.from_pretrained(
-                model_name, 
-                num_labels=self.num_classes
-            )
-            freeze_layers(self.model, self.fraction_layers_to_finetune)  
-        else:
-            raise ValueError(
-                "Need `AutoTokenizer`, `AutoModelForSequenceClassification` "
-                "from `transformers` package."
-            )
-       
+    # create the model
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            model_name, 
+            num_labels=self.num_classes
+        )
+        freeze_layers(self.model, self.fraction_layers_to_finetune)  
+
         # Training and validating
         self.model.to(self.device)
         assert dataset is not None, f"`dataset` cannot be None here!"

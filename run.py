@@ -37,15 +37,15 @@ def main_loop(
         output_path: Path,
         data_path: Path,
         seed: int,
-        val_size: float = 0.2,
-        vocab_size: int = 10000,
-        token_length: int = 128,
-        epochs: int = 5,
-        batch_size: int = 32,
-        lr: float = 0.0001,
-        weight_decay: float = 0.01,
-        fraction_layers_to_finetune: float = 1.0,
-        data_fraction: int = 1.0,
+        val_size: float,
+        vocab_size: int,
+        token_length: int,
+        epochs: int,
+        batch_size: int,
+        lr: float,
+        weight_decay: float,
+        fraction_layers_to_finetune: float,
+        data_fraction: int,
         load_path: Path = None,
     ) -> None:
     
@@ -83,11 +83,6 @@ def main_loop(
 
     print("Fitting Text AutoML")
 
-    # You do not need to follow this setup or API it's merely here to provide
-    # an example of how your AutoML system could be used.
-    # As a general rule of thumb, you should **never** pass in any
-    # test data to your AutoML solution other than to generate predictions.
-
     # Get the dataset and create dataloaders
     data_path = Path(data_path) if isinstance(data_path, str) else data_path
     data_info = dataset_class(data_path).create_dataloaders(val_size=val_size, random_state=seed, use_class_weights = True)
@@ -100,7 +95,7 @@ def main_loop(
         normalized_class_weights = data_info["normalized_class_weights"]
     else:
         normalized_class_weights = None
-    
+
     # if i want to use like 0.5 so half of the data i can do it here, useful for succesive halving
     if data_fraction < 1:
         _subsample = np.random.choice(
@@ -119,6 +114,8 @@ def main_loop(
         "test_size": len(test_df),
         "num_classes": num_classes
     }, allow_val_change=True)
+
+    # TODO implement bohb for the model hyperparameters
 
     # Initialize the TextAutoML instance with the best parameters
     automl = TextAutoML(
@@ -194,7 +191,8 @@ if __name__ == "__main__":
     # Random seed for reproducibility if you are using any randomness,
     # i.e. torch, numpy, pandas, sklearn, etc.
     seed = 42
-    dataset = "imdb"
+    dataset = "amazon"
+    print(f"Running AutoML for dataset: {dataset}")
     output_path =  (
             Path.cwd().absolute() / 
             "results" / 
@@ -205,27 +203,23 @@ if __name__ == "__main__":
     output_path.mkdir(parents=True, exist_ok=True)
     data_path = Path.cwd().absolute() / ".data"
     load_path = None
-    vocab_size = 1000
-    token_length = 128
-    epochs = 10
-    batch_size = 32
-    lr = 5e-6
-    weight_decay = 0.01
     # "Subsampling of training set, in fraction (0, 1]. 1 is all the data"
-    data_fraction = 1.0
     
     main_loop(
         dataset=dataset,
         output_path=Path(output_path).absolute(),
         data_path=Path(data_path).absolute(),
         seed=seed,
-        vocab_size=vocab_size,
-        token_length=token_length,
-        epochs=epochs,
-        batch_size=batch_size,
-        lr=lr,
-        weight_decay=weight_decay,
-        data_fraction=data_fraction,
-        load_path=Path(load_path) if load_path is not None else None
+        vocab_size=1000,
+        token_length=128,
+        epochs= 10,
+        batch_size=32,
+        lr=5e-6,
+        weight_decay=0.01,
+        data_fraction=1.0,
+        load_path=Path(load_path) if load_path is not None else None,
+        val_size = 0.2,
+        fraction_layers_to_finetune=1.0,  # 1.0 means finetune all layers
     )
+
 # end of file

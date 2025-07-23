@@ -15,60 +15,6 @@ import optuna
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 
-
-class CustomClassificationHead(nn.Module):
-    """Custom classification head with configurable architecture."""
-    def __init__(self, hidden_size, num_classes, dropout_rate=0.1, num_hidden_layers=1, hidden_dim=None):
-        super().__init__()
-        
-        if hidden_dim is None:
-            hidden_dim = hidden_size // 2
-            
-        layers = []
-        
-        # First layer
-        layers.append(nn.Dropout(dropout_rate))
-        layers.append(nn.Linear(hidden_size, hidden_dim))
-        layers.append(nn.ReLU())
-        
-        # Additional hidden layers
-        for _ in range(num_hidden_layers - 1):
-            layers.append(nn.Dropout(dropout_rate))
-            layers.append(nn.Linear(hidden_dim, hidden_dim))
-            layers.append(nn.ReLU())
-        
-        # Output layer
-        layers.append(nn.Dropout(dropout_rate))
-        layers.append(nn.Linear(hidden_dim, num_classes))
-        
-        self.classifier = nn.Sequential(*layers)
-    
-    def forward(self, x):
-        return self.classifier(x)
-
-class DistilBertWithCustomHead(nn.Module):
-    """DistilBERT model with custom classification head."""
-    def __init__(self, base_model, custom_head):
-        super().__init__()
-        self.distilbert = base_model
-        self.classifier = custom_head
-        
-    def forward(self, input_ids=None, attention_mask=None, labels=None, **kwargs):
-        outputs = self.distilbert(input_ids=input_ids, attention_mask=attention_mask)
-        sequence_output = outputs.last_hidden_state
-        
-        # Use [CLS] token representation
-        cls_output = sequence_output[:, 0]  # First token is [CLS]
-        logits = self.classifier(cls_output)
-        
-        loss = None
-        if labels is not None:
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(logits, labels)
-            
-        return type('Outputs', (), {'loss': loss, 'logits': logits})()
-
-
 class TextAutoML:
     def __init__(
         self,
