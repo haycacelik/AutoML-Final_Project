@@ -6,20 +6,18 @@ For a test run:
 1) Download datasets (see, README) at chosen path
 2) Run the script: 
 ```
-python run.py \
-    --dataset amazon \
-    --epochs 1
+python -m run 
 ```
 
 """
 from __future__ import annotations
 
-import argparse
 import numpy as np
 from pathlib import Path
 from sklearn.metrics import accuracy_score, classification_report
 import yaml
 import wandb
+import time
 
 from automl.core import TextAutoML
 from automl.datasets import (
@@ -27,6 +25,7 @@ from automl.datasets import (
     AmazonReviewsDataset,
     DBpediaDataset,
     IMDBDataset,
+    get_fraction_of_data,
 )
 
 FINAL_TEST_DATASET=...  # TBA later
@@ -48,6 +47,9 @@ def main_loop(
         data_fraction: int,
         load_path: Path = None,
     ) -> None:
+
+    # get start time
+    start_time = time.time()
     
     # Initialize wandb
     wandb.init(
@@ -98,12 +100,8 @@ def main_loop(
 
     # if i want to use like 0.5 so half of the data i can do it here, useful for succesive halving
     if data_fraction < 1:
-        _subsample = np.random.choice(
-            list(range(len(train_df))),
-            size=int(data_fraction * len(train_df)),
-            replace=False,
-        )
-        train_df = train_df.iloc[_subsample]
+        print(f"Subsampling training data to {data_fraction * 100}%")
+        train_df = get_fraction_of_data(train_df, data_fraction)
     
     print(f"Train size: {len(train_df)}, Validation size: {len(val_df)}, Test size: {len(test_df)}")
     
@@ -115,7 +113,7 @@ def main_loop(
         "num_classes": num_classes
     }, allow_val_change=True)
 
-    # TODO implement bohb for the model hyperparameters
+    # TODO implement BOHB for the model hyperparameters, can remove the parts below and add it in the optimizer
 
     # Initialize the TextAutoML instance with the best parameters
     automl = TextAutoML(
@@ -129,16 +127,18 @@ def main_loop(
         lr=lr,
         weight_decay=weight_decay,
         fraction_layers_to_finetune=fraction_layers_to_finetune,
-    )
-
-    # Fit the AutoML model on the training and validation datasets
-    val_err = automl.fit(
-        train_df,
-        val_df,
+        classification_head_hidden_dim=64,
+        classification_head_dropout_rate=0.2,
+        classification_head_hidden_layers=4,
+        train_df=train_df,
+        val_df=val_df,
         num_classes=num_classes,
         load_path=load_path,
         save_path=output_path,
     )
+
+    # Fit the AutoML model on the training and validation datasets
+    val_err = automl.fit()
     print("Training complete")
 
     # Predict on the test set
@@ -183,7 +183,20 @@ def main_loop(
         # This is the setting for the exam dataset, you will not have access to the labels
         print(f"No test labels available for dataset '{dataset}'")
 
+    # Print total execution time
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    # turn it to minute and seconds
+    elapsed_minutes = elapsed_time // 60
+    elapsed_seconds = elapsed_time % 60
+    print(f"Total execution time: {elapsed_minutes:.0f} minutes and {elapsed_seconds:.2f} seconds")
+
+    # Log total execution time to wandb
+    # TODO add it to the results file, also make the results file better.
+    wandb.log({"total_execution_time": elapsed_time})
+
     wandb.finish()
+
     return val_err
 
 
@@ -191,7 +204,7 @@ if __name__ == "__main__":
     # Random seed for reproducibility if you are using any randomness,
     # i.e. torch, numpy, pandas, sklearn, etc.
     seed = 42
-    dataset = "amazon"
+    dataset = "imdb"
     print(f"Running AutoML for dataset: {dataset}")
     output_path =  (
             Path.cwd().absolute() / 
@@ -203,8 +216,7 @@ if __name__ == "__main__":
     output_path.mkdir(parents=True, exist_ok=True)
     data_path = Path.cwd().absolute() / ".data"
     load_path = None
-    # "Subsampling of training set, in fraction (0, 1]. 1 is all the data"
-    
+
     main_loop(
         dataset=dataset,
         output_path=Path(output_path).absolute(),
@@ -216,7 +228,7 @@ if __name__ == "__main__":
         batch_size=32,
         lr=5e-6,
         weight_decay=0.01,
-        data_fraction=1.0,
+        data_fraction=1.0, # "Subsampling of training set, in fraction (0, 1]. 1 is all the data"
         load_path=Path(load_path) if load_path is not None else None,
         val_size = 0.2,
         fraction_layers_to_finetune=1.0,  # 1.0 means finetune all layers

@@ -28,17 +28,30 @@ class CustomClassificationHead(nn.Module):
         return self.classifier(x)
     
 def freeze_layers(model, fraction_layers_to_finetune: float=1.0) -> None:
-    """Freeze layers in the model based on fraction to finetune."""
-    # if the value is 1.0, then do not freeze any layers
+    """Freeze layers in the model based on fraction to finetune. 
+    If the value is 1.0, then do not freeze any layers"""
     
-    # Handle custom head model
+    transformer = None
+    print("Freezing transformer layers based on fraction to finetune:", fraction_layers_to_finetune)
+    
+    # Handle custom head model (DistilBertWithCustomHead)
     if hasattr(model, 'distilbert') and hasattr(model.distilbert, 'transformer'):
         transformer = model.distilbert.transformer
-    # Handle standard transformers model
-    elif hasattr(model, 'distilbert'):
+        print("Found transformer in custom head model")
+    # Handle direct DistilBERT AutoModel
+    elif hasattr(model, 'transformer'):
+        transformer = model.transformer
+        print("Found transformer in direct AutoModel")
+    # Handle AutoModelForSequenceClassification
+    elif hasattr(model, 'distilbert') and hasattr(model.distilbert, 'transformer'):
         transformer = model.distilbert.transformer
+        print("Found transformer in AutoModelForSequenceClassification")
     else:
         print("Warning: Could not find transformer layers to freeze")
+        print(f"Model type: {type(model)}")
+        print(f"Model attributes: {dir(model)}")
+        if hasattr(model, 'distilbert'):
+            print(f"DistilBERT attributes: {dir(model.distilbert)}")
         return
     
     total_layers = len(transformer.layer)
@@ -55,21 +68,30 @@ class DistilBertWithCustomHead(nn.Module):
     """DistilBERT model with custom classification head."""
     def __init__(self, base_model, custom_head):
         super().__init__()
-        self.distilbert = base_model
+        self.pre_trained_model = base_model
         self.classifier = custom_head
         
-    def forward(self, input_ids=None, attention_mask=None, labels=None, **kwargs):
-        outputs = self.distilbert(input_ids=input_ids, attention_mask=attention_mask)
+    def forward(self, inputs, loss_function):
+        input_ids, attention_mask = inputs['input_ids'], inputs['attention_mask']
+        outputs = self.pre_trained_model(input_ids=input_ids, attention_mask=attention_mask)
         sequence_output = outputs.last_hidden_state
         
         # Use [CLS] token representation
         cls_output = sequence_output[:, 0]  # First token is [CLS]
         logits = self.classifier(cls_output)
         
-        loss = None
-        if labels is not None:
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(logits, labels)
+        labels = inputs['labels']
+        loss = loss_function(logits, labels)
             
-        return type('Outputs', (), {'loss': loss, 'logits': logits})()
+        return loss, logits
+    
+    def predict(self, inputs):
+        input_ids, attention_mask = inputs['input_ids'], inputs['attention_mask']
+        outputs = self.pre_trained_model(input_ids=input_ids, attention_mask=attention_mask)
+        sequence_output = outputs.last_hidden_state
+        
+        # Use [CLS] token representation
+        cls_output = sequence_output[:, 0]
+        logits = self.classifier(cls_output)
 
+        return logits

@@ -33,6 +33,9 @@ class BaseTextDataset(ABC):
         text = text.translate(str.maketrans('', '', string.punctuation))
         # Remove extra whitespace
         text = ' '.join(text.split())
+        # Handle empty text
+        if text == "":
+            print("Warning: Empty text after preprocessing. Returning empty string.")
         return text
     
     def create_dataloaders(
@@ -45,31 +48,15 @@ class BaseTextDataset(ABC):
         """Create train/validation/test dataloaders and preprocessing objects."""
         train_df, test_df = self.load_data()  # not implemented in base class `BaseTextDataset`
         label_column = train_df.columns[1]
-        print("Train_df with labels and class instance counts:\n",train_df[label_column].value_counts())
+        print("Train_df before split with labels and class instance counts:\n", train_df[label_column].value_counts())
         
+        # only one data balancing technique can be used at a time
         if set_class_count_min and use_class_weights:
             raise ValueError("Cannot set class count to minimum and use class weights at the same time. Or neither of them.")
         
+        # data balancing technique
         if set_class_count_min:
-            # get class counts, sort by label from 0 to 
-            label_column = train_df.columns[1]
-            class_counts = self.get_num_classes(train_df)
-            print("train_df before split, original class counts", class_counts)
-            
-            class_instance_counts = train_df[label_column].value_counts().sort_index().to_numpy()
-            print("train_df before split, original class counts", class_counts)
-            
-            # find the minimum number of instances in any class
-            min_class_count = class_instance_counts.min()
-
-            # Subsample each class to the minimum class count
-            subsampled_dfs = []
-            for label, group in train_df.groupby(label_column):
-                subsampled = group.sample(n=min_class_count, random_state=random_state)
-                subsampled_dfs.append(subsampled)
-            train_df = pd.concat(subsampled_dfs)
-            print(f"New dataset length: {len(train_df)}")
-            print(train_df[label_column].value_counts())
+            self.set_class_instances_to_lowest(train_df, random_state)
 
         # Split training data into train/validation
         if val_size > 0:
@@ -80,23 +67,10 @@ class BaseTextDataset(ABC):
         else:
             val_df = None
 
+        # data balancing technique
         if use_class_weights:
-            # how many classes are there? find the 
-            label_column = train_df.columns[1]
-            class_counts = self.get_num_classes(train_df)
-            print("train_df after split, original class counts", class_counts)
-            
-            class_instance_counts = train_df[label_column].value_counts().sort_index().to_numpy()
-            print("train_df after split, original class counts", class_instance_counts)
-            
-            # Calculate class weights
-            # for each class do total instances / instances for that class
-            total_instances = len(train_df)
-            class_weights = total_instances / class_instance_counts
-            print("class weights", class_weights, type(class_weights))
-            normalized_class_weights = class_weights * (len(class_instance_counts) / np.sum(class_weights))
-            print("normalized class weights", normalized_class_weights, type(normalized_class_weights))
-        
+            normalized_class_weights = self.get_class_weights(train_df)
+
         # Preprocess text
         train_df['text'] = train_df['text'].apply(self.preprocess_text)
         if val_df is not None:
@@ -110,7 +84,45 @@ class BaseTextDataset(ABC):
             "num_classes": self.get_num_classes(train_df),
             "normalized_class_weights": normalized_class_weights if use_class_weights else None
         }
+    
+    def set_class_instances_to_lowest(self, train_df, random_state: int) -> None:
+        """Set class instances to lowest value. Used to ensure balanced classes. Wastes data.
+        Deprecated with the use of class weights."""
+        # get class counts, sort by label from 0 to <num_classes>
+        label_column = train_df.columns[1]
+        class_counts = self.get_num_classes(train_df)
+        # print("train_df before split, original class counts", class_counts)
+        class_instance_counts = train_df[label_column].value_counts().sort_index().to_numpy()
+        # print("train_df before split, original class counts", class_counts)
+        
+        # find the minimum number of instances in any class
+        min_class_count = class_instance_counts.min()
 
+        # Subsample each class to the minimum class count
+        subsampled_dfs = []
+        for label, group in train_df.groupby(label_column):
+            subsampled = group.sample(n=min_class_count, random_state=random_state)
+            subsampled_dfs.append(subsampled)
+        train_df = pd.concat(subsampled_dfs)
+        # print(f"New dataset length: {len(train_df)}")
+        print(train_df[label_column].value_counts())
+
+    def get_class_weights(self, train_df: pd.DataFrame) -> Dict[int, float]:
+        """Get class weights for imbalanced datasets."""
+        label_column = train_df.columns[1]
+        class_counts = self.get_num_classes(train_df)
+        # print("train_df after split, original class counts", class_counts)
+        class_instance_counts = train_df[label_column].value_counts().sort_index().to_numpy()
+        # print("train_df after split, original class counts", class_instance_counts)
+        
+        # Calculate class weights
+        total_instances = len(train_df)
+        class_weights = total_instances / class_instance_counts
+        # print("class weights", class_weights, type(class_weights))
+        normalized_class_weights = class_weights * (len(class_instance_counts) / np.sum(class_weights))
+        # print("normalized class weights", normalized_class_weights, type(normalized_class_weights))
+
+        return normalized_class_weights
 
 class AGNewsDataset(BaseTextDataset):
     """AG News dataset for news categorization (4 classes)."""
@@ -185,5 +197,12 @@ class DBpediaDataset(BaseTextDataset):
 
         return train_df, test_df
 
-def set_class_num_to_lowest():
-    pass
+def get_fraction_of_data(self, df: pd.DataFrame, fraction: float) -> pd.DataFrame:
+        """Get a fraction of the data."""
+        _subsample = np.random.choice(
+            list(range(len(df))),
+            size=int(fraction * len(df)),
+            replace=False,
+        )
+        df = df.iloc[_subsample]
+        return df

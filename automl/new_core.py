@@ -307,96 +307,96 @@ class TextAutoML:
 
         return self._predict(_loader)
 
-    def optimize_hyperparameters(
-        self,
-        train_df: pd.DataFrame,
-        val_df: pd.DataFrame,
-        num_classes: int,
-        n_trials: int = 50,
-        timeout: int = 3600,  # 1 hour timeout
-        study_name: str = "automl_optimization"
-    ):
-        """Use Optuna to optimize hyperparameters."""
-        if not OPTUNA_AVAILABLE:
-            raise ValueError("Optuna is not available. Please install it with: pip install optuna")
+    # def optimize_hyperparameters(
+    #     self,
+    #     train_df: pd.DataFrame,
+    #     val_df: pd.DataFrame,
+    #     num_classes: int,
+    #     n_trials: int = 50,
+    #     timeout: int = 3600,  # 1 hour timeout
+    #     study_name: str = "automl_optimization"
+    # ):
+    #     """Use Optuna to optimize hyperparameters."""
+    #     if not OPTUNA_AVAILABLE:
+    #         raise ValueError("Optuna is not available. Please install it with: pip install optuna")
         
-        # Store data for objective function
-        self._optuna_train_df = train_df
-        self._optuna_val_df = val_df
-        self._optuna_num_classes = num_classes
+    #     # Store data for objective function
+    #     self._optuna_train_df = train_df
+    #     self._optuna_val_df = val_df
+    #     self._optuna_num_classes = num_classes
         
-        # Create Optuna study
-        study = optuna.create_study(
-            direction="minimize",  # Minimize validation error
-            study_name=study_name,
-            storage=None  # In-memory storage
-        )
+    #     # Create Optuna study
+    #     study = optuna.create_study(
+    #         direction="minimize",  # Minimize validation error
+    #         study_name=study_name,
+    #         storage=None  # In-memory storage
+    #     )
         
-        # Run optimization
-        study.optimize(
-            self._objective,
-            n_trials=n_trials,
-            timeout=timeout,
-            show_progress_bar=True
-        )
+    #     # Run optimization
+    #     study.optimize(
+    #         self._objective,
+    #         n_trials=n_trials,
+    #         timeout=timeout,
+    #         show_progress_bar=True
+    #     )
         
-        print("Best trial:")
-        print(f"  Value: {study.best_value}")
-        print(f"  Params: {study.best_params}")
+    #     print("Best trial:")
+    #     print(f"  Value: {study.best_value}")
+    #     print(f"  Params: {study.best_params}")
         
-        # Update model with best parameters
-        best_params = study.best_params
-        self._update_from_params(best_params)
+    #     # Update model with best parameters
+    #     best_params = study.best_params
+    #     self._update_from_params(best_params)
         
-        return study.best_params, study.best_value
+    #     return study.best_params, study.best_value
 
-    def _objective(self, trial):
-        """Optuna objective function."""
-        # Suggest hyperparameters
-        params = {
-            'lr': trial.suggest_float('lr', 1e-5, 1e-2, log=True),
-            'batch_size': trial.suggest_categorical('batch_size', [16, 32, 64, 128]),
-            'weight_decay': trial.suggest_float('weight_decay', 1e-6, 1e-1, log=True),
-            'epochs': trial.suggest_int('epochs', 3, 10),
-            'fraction_layers_to_finetune': trial.suggest_float('fraction_layers_to_finetune', 0.1, 1.0),
-        }
+    # def _objective(self, trial):
+    #     """Optuna objective function."""
+    #     # Suggest hyperparameters
+    #     params = {
+    #         'lr': trial.suggest_float('lr', 1e-5, 1e-2, log=True),
+    #         'batch_size': trial.suggest_categorical('batch_size', [16, 32, 64, 128]),
+    #         'weight_decay': trial.suggest_float('weight_decay', 1e-6, 1e-1, log=True),
+    #         'epochs': trial.suggest_int('epochs', 3, 10),
+    #         'fraction_layers_to_finetune': trial.suggest_float('fraction_layers_to_finetune', 0.1, 1.0),
+    #     }
         
-        if self.use_custom_head:
-            params.update({
-                'head_dropout_rate': trial.suggest_float('head_dropout_rate', 0.1, 0.5),
-                'head_hidden_layers': trial.suggest_int('head_hidden_layers', 1, 3),
-                'head_hidden_dim': trial.suggest_categorical('head_hidden_dim', [128, 256, 512, 768])
-            })
+    #     if self.use_custom_head:
+    #         params.update({
+    #             'head_dropout_rate': trial.suggest_float('head_dropout_rate', 0.1, 0.5),
+    #             'head_hidden_layers': trial.suggest_int('head_hidden_layers', 1, 3),
+    #             'head_hidden_dim': trial.suggest_categorical('head_hidden_dim', [128, 256, 512, 768])
+    #         })
         
-        # Update model parameters
-        self._update_from_params(params)
+    #     # Update model parameters
+    #     self._update_from_params(params)
         
-        # Train model with suggested parameters
-        try:
-            val_error = self.fit(
-                self._optuna_train_df,
-                self._optuna_val_df,
-                self._optuna_num_classes,
-                **params
-            )
+    #     # Train model with suggested parameters
+    #     try:
+    #         val_error = self.fit(
+    #             self._optuna_train_df,
+    #             self._optuna_val_df,
+    #             self._optuna_num_classes,
+    #             **params
+    #         )
             
-            # Log to wandb if available
-            if wandb.run is not None:
-                wandb.log({
-                    "optuna_trial": trial.number,
-                    "optuna_val_error": val_error,
-                    **params
-                })
+    #         # Log to wandb if available
+    #         if wandb.run is not None:
+    #             wandb.log({
+    #                 "optuna_trial": trial.number,
+    #                 "optuna_val_error": val_error,
+    #                 **params
+    #             })
             
-            return val_error
+    #         return val_error
             
-        except Exception as e:
-            print(f"Trial {trial.number} failed with error: {e}")
-            return float('inf')  # Return worst possible value
+    #     except Exception as e:
+    #         print(f"Trial {trial.number} failed with error: {e}")
+    #         return float('inf')  # Return worst possible value
     
-    def _update_from_params(self, params):
-        """Update model parameters from Optuna suggestions."""
-        for key, value in params.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
+    # def _update_from_params(self, params):
+    #     """Update model parameters from Optuna suggestions."""
+    #     for key, value in params.items():
+    #         if hasattr(self, key):
+    #             setattr(self, key, value)
 
