@@ -1,17 +1,3 @@
-"""A STARTER KIT SCRIPT for SS25 AutoML Exam --- Modality III: Text
-
-You are not expected to follow this script or be constrained to it.
-
-For a test run:
-1) Download datasets (see, README) at chosen path
-2) Run the script: 
-```
-python -m run 
-```
-
-"""
-from __future__ import annotations
-
 import numpy as np
 from pathlib import Path
 from sklearn.metrics import accuracy_score, classification_report
@@ -36,30 +22,31 @@ def main_loop(
         output_path: Path,
         data_path: Path,
         seed: int,
-        val_size: float,
-        vocab_size: int,
+        val_percentage: float,
         token_length: int,
         epochs: int,
         batch_size: int,
         lr: float,
         weight_decay: float,
         fraction_layers_to_finetune: float,
-        data_fraction: int,
+        data_fraction: float,
+        classification_head_hidden_dim: int,
+        classification_head_dropout_rate: float,
+        classification_head_hidden_layers: int,
         load_path: Path = None,
     ) -> None:
 
     # get start time
     start_time = time.time()
-    
+
     # Initialize wandb
-    wandb.init(
+    wandb_run = wandb.init(
         project="text-automl",
         name=f"{dataset}_epochs{epochs}_lr{lr}_bs{batch_size}",  # Custom run name
         config={
             "dataset": dataset,
             "seed": seed,
-            "val_percentage": val_size,
-            "vocab_size": vocab_size,
+            "val_percentage": val_percentage,
             "token_length": token_length,
             "epochs": epochs,
             "batch_size": batch_size,
@@ -67,6 +54,9 @@ def main_loop(
             "weight_decay": weight_decay,
             "fraction_layers_to_finetune": fraction_layers_to_finetune,
             "data_fraction": data_fraction,
+            "classification_head_hidden_dim": classification_head_hidden_dim,
+            "classification_head_dropout_rate": classification_head_dropout_rate,
+            "classification_head_hidden_layers": classification_head_hidden_layers
         },
         tags=[dataset, "distilbert", "text-classification"]  # Add tags for easy filtering
     )
@@ -87,7 +77,7 @@ def main_loop(
 
     # Get the dataset and create dataloaders
     data_path = Path(data_path) if isinstance(data_path, str) else data_path
-    data_info = dataset_class(data_path).create_dataloaders(val_size=val_size, random_state=seed, use_class_weights = True)
+    data_info = dataset_class(data_path).create_dataloaders(val_size=val_percentage, random_state=seed, use_class_weights = True)
 
     train_df = data_info['train_df']
     val_df = data_info.get('val_df', None)
@@ -98,7 +88,7 @@ def main_loop(
     else:
         normalized_class_weights = None
 
-    # if i want to use like 0.5 so half of the data i can do it here, useful for succesive halving
+    # if i want to use like 0.5 so half of the data i can do it here, useful for successive halving
     if data_fraction < 1:
         print(f"Subsampling training data to {data_fraction * 100}%")
         train_df = get_fraction_of_data(train_df, data_fraction)
@@ -106,7 +96,7 @@ def main_loop(
     print(f"Train size: {len(train_df)}, Validation size: {len(val_df)}, Test size: {len(test_df)}")
     
     # Update wandb config with dataset info
-    wandb.config.update({
+    wandb_run.config.update({
         "train_size": len(train_df),
         "val_size": len(val_df) if val_df is not None else 0,
         "test_size": len(test_df),
@@ -120,21 +110,21 @@ def main_loop(
         # normalized_class_weights=normalized_class_weights,
         normalized_class_weights=None,
         seed=seed,
-        vocab_size=vocab_size,
         token_length=token_length,
         epochs=epochs,
         batch_size=batch_size,
         lr=lr,
         weight_decay=weight_decay,
         fraction_layers_to_finetune=fraction_layers_to_finetune,
-        classification_head_hidden_dim=64,
-        classification_head_dropout_rate=0.2,
-        classification_head_hidden_layers=4,
+        classification_head_hidden_dim=classification_head_hidden_dim,
+        classification_head_dropout_rate=classification_head_dropout_rate,
+        classification_head_hidden_layers=classification_head_hidden_layers,
         train_df=train_df,
         val_df=val_df,
         num_classes=num_classes,
         load_path=load_path,
         save_path=output_path,
+        wandb_logger=wandb_run,
     )
 
     # Fit the AutoML model on the training and validation datasets
@@ -154,7 +144,7 @@ def main_loop(
     print(f"Saved test prediction at {output_path / 'test_preds.npy'}")
 
     # Log validation error to wandb
-    wandb.log({"val_error": float(val_err)})
+    wandb_run.log({"val_error": float(val_err)})
 
     # In case of running on the final exam data, also add the predictions.npy
     # to the correct location for auto evaluation.
@@ -170,7 +160,7 @@ def main_loop(
         print(f"Accuracy on test set: {acc}")
         
         # Log test accuracy to wandb
-        wandb.log({"test_accuracy": acc, "test_error": float(1-acc)})
+        wandb_run.log({"test_accuracy": acc, "test_error": float(1-acc)})
         
         with (output_path / "score.yaml").open("a+") as f:
             yaml.safe_dump({"test_err": float(1-acc)}, f)
@@ -193,16 +183,15 @@ def main_loop(
 
     # Log total execution time to wandb
     # TODO add it to the results file, also make the results file better.
-    wandb.log({"total_execution_time": elapsed_time})
+    wandb_run.log({"total_execution_time": elapsed_time})
 
-    wandb.finish()
+    wandb_run.finish()
 
     return val_err
 
 
 if __name__ == "__main__":
-    # Random seed for reproducibility if you are using any randomness,
-    # i.e. torch, numpy, pandas, sklearn, etc.
+    # seed for reproducibility
     seed = 42
     dataset = "imdb"
     print(f"Running AutoML for dataset: {dataset}")
@@ -214,7 +203,7 @@ if __name__ == "__main__":
         )
     output_path = Path(output_path).absolute()
     output_path.mkdir(parents=True, exist_ok=True)
-    data_path = Path.cwd().absolute() / ".data"
+    data_path = Path.cwd().absolute() / "data"
     load_path = None
 
     main_loop(
@@ -222,16 +211,18 @@ if __name__ == "__main__":
         output_path=Path(output_path).absolute(),
         data_path=Path(data_path).absolute(),
         seed=seed,
-        vocab_size=1000,
         token_length=128,
         epochs= 10,
         batch_size=32,
         lr=5e-6,
         weight_decay=0.01,
         data_fraction=1.0, # "Subsampling of training set, in fraction (0, 1]. 1 is all the data"
-        load_path=Path(load_path) if load_path is not None else None,
-        val_size = 0.2,
-        fraction_layers_to_finetune=1.0,  # 1.0 means finetune all layers
+        val_percentage = 0.2,
+        fraction_layers_to_finetune=0.0,  # 1.0 means finetune all layers
+        classification_head_hidden_dim=64,
+        classification_head_dropout_rate = 0.2,
+        classification_head_hidden_layers = 4,
+        load_path = Path(load_path) if load_path is not None else None
     )
 
 # end of file
