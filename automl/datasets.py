@@ -171,7 +171,7 @@ class AmazonReviewsDataset(BaseTextDataset):
             train_df = pd.read_csv(train_path)
             test_df = pd.read_csv(test_path)
         else:
-            raise FileNotFoundError(f"Data files not found at {train_path}, generating dummy data...")
+            raise FileNotFoundError(f"Data files not found at {train_path}")
         
         return train_df, test_df
 

@@ -8,15 +8,17 @@ from automl.utils import SimpleTextDataset
 from pathlib import Path
 from typing import Tuple
 import wandb
+from wandb.sdk.wandb_run import Run
 from transformers import AutoTokenizer, AutoModel
 from automl.model.custom_model import CustomClassificationHead, DistilBertWithCustomHead, freeze_layers
+
+model_name = 'distilbert-base-uncased'
 
 class TextAutoML:
     def __init__(
         self,
         normalized_class_weights,
         seed,
-        vocab_size, # Right now does nothing since we use a autotokenizer and use its vocab size
         token_length,
         epochs,
         batch_size,
@@ -31,15 +33,13 @@ class TextAutoML:
         num_classes: int,
         load_path: Path,
         save_path: Path,
-
+        wandb_logger: Run
     ):
         self.seed = seed
         np.random.seed(seed)
         torch.manual_seed(seed)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        print(self.device)
-        self.vocab_size = vocab_size
         self.token_length = token_length
         self.epochs = epochs
         self.batch_size = batch_size
@@ -57,11 +57,35 @@ class TextAutoML:
         self.num_classes = num_classes
         self.load_path = load_path
         self.save_path = save_path
+        self.wandb_logger = wandb_logger
+
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.vocab_size = self.tokenizer.vocab_size
+        wandb_logger.config.update({"vocab_size": self.vocab_size})
 
         print("---learning rate", self.lr)
         print("---fraction layers to finetune", self.fraction_layers_to_finetune)
         if fraction_layers_to_finetune == 0.0:
             print("---Warning: fraction_layers_to_finetune is set to 0.0, which means all layers will be frozen.")
+
+        # Create model with custom classification head
+        self.base_model = AutoModel.from_pretrained(model_name)
+        freeze_layers(self.base_model, self.fraction_layers_to_finetune)
+        hidden_size = self.base_model.config.hidden_size
+        wandb_logger.config.update({"hidden_size": hidden_size})
+        self.custom_head = CustomClassificationHead(
+            hidden_size=hidden_size,
+            num_classes=self.num_classes,
+            dropout_rate=self.classification_head_dropout_rate,
+            num_hidden_layers=self.classification_head_hidden_layers,
+            hidden_dim=self.classification_head_hidden_dim
+        )
+        # Combine base model and custom head
+        self.model = DistilBertWithCustomHead(self.base_model, self.custom_head)
+        self.model.to(self.device)
+
+        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        wandb_logger.config.update({"optimizer": "AdamW"})
 
     def fit(self):
         """
@@ -69,10 +93,6 @@ class TextAutoML:
         """
         print("---Loading and preparing data...")
 
-        model_name = 'distilbert-base-uncased'
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.vocab_size = self.tokenizer.vocab_size
-        
         dataset = SimpleTextDataset(
             self.train_texts, self.train_labels, self.tokenizer, self.token_length
         )
@@ -83,25 +103,9 @@ class TextAutoML:
         )
         val_loader = DataLoader(_dataset, batch_size=self.batch_size, shuffle=True)
 
-        ## CREATE THE MODEL WITH CUSTOM HEAD
-        self.base_model = AutoModel.from_pretrained(model_name)
-        freeze_layers(self.base_model, self.fraction_layers_to_finetune)
-        # Create custom classification head
-        hidden_size = self.base_model.config.hidden_size
-        self.custom_head = CustomClassificationHead(
-            hidden_size=hidden_size,
-            num_classes=self.num_classes,
-            dropout_rate=self.classification_head_dropout_rate,
-            num_hidden_layers=self.classification_head_hidden_layers,
-            hidden_dim=self.classification_head_hidden_dim
-        )
-        # Combine base model and custom head
-        self.model = DistilBertWithCustomHead(self.base_model, self.custom_head)
+        assert dataset is not None, f"`dataset` cannot be None here!"
 
         # Training and validating
-        self.model.to(self.device)
-        assert dataset is not None, f"`dataset` cannot be None here!"
-        # loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
         val_acc = self._train_loop(
             train_loader,
             val_loader,
@@ -118,8 +122,6 @@ class TextAutoML:
         load_path: Path=None,
         save_path: Path=None,
     ):
-        optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
-        
         # TODO still have not checked if it makes a big difference, should check it with amazon
         if self.normalized_class_weights is not None:
             class_weights = torch.tensor(self.normalized_class_weights, dtype=torch.float).to(self.device)
@@ -133,7 +135,7 @@ class TextAutoML:
         if load_path is not None:
             _states = torch.load(load_path / "checkpoint.pth", map_location='cpu')  # Load to CPU first
             self.model.load_state_dict(_states["model_state_dict"])
-            optimizer.load_state_dict(_states["optimizer_state_dict"])
+            self.optimizer.load_state_dict(_states["optimizer_state_dict"])
             start_epoch = _states["epoch"]
             print(f"---Resuming from checkpoint at {start_epoch}")
 
@@ -144,13 +146,13 @@ class TextAutoML:
             
             for batch in train_loader:
                 self.model.train()
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
 
                 inputs = {k: v.to(self.device) for k, v in batch.items()}
                 loss, logits = self.model.forward(inputs, criterion)  # Forward pass
                 labels = inputs['labels']
                 loss.backward()
-                optimizer.step()
+                self.optimizer.step()
                 total_loss += loss.item()
                 
                 # Collect predictions and labels for training accuracy
@@ -169,15 +171,13 @@ class TextAutoML:
             print(f"---Epoch {epoch + 1}, Validation Accuracy: {val_acc:.4f}")
             
             # Log training and validation accuracy to wandb
-            if wandb.run is not None:
-                wandb.log({
-                    "epoch": epoch + 1,
-                    "train_loss": total_loss,
-                    "train_accuracy": train_acc,
-                    "epoch": epoch + 1,
-                    "val_accuracy": val_acc,
-                    "learning_rate": optimizer.param_groups[0]['lr'],
-                })
+            self.wandb_logger.log({
+                "epoch": epoch + 1,
+                "train_loss": total_loss,
+                "train_accuracy": train_acc,
+                "val_accuracy": val_acc,
+                "learning_rate": self.optimizer.param_groups[0]['lr'],
+            })
 
         if save_path is not None:
             save_path = Path(save_path) if not isinstance(save_path, Path) else save_path
@@ -186,7 +186,7 @@ class TextAutoML:
             torch.save(
                 {
                     "model_state_dict": self.model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
+                    "optimizer_state_dict": self.optimizer.state_dict(),
                     "epoch": epoch,
                 },
                 save_path / "checkpoint.pth"
