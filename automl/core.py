@@ -7,7 +7,6 @@ from sklearn.metrics import accuracy_score
 from automl.utils import SimpleTextDataset
 from pathlib import Path
 from typing import Tuple
-import wandb
 from wandb.sdk.wandb_run import Run
 from transformers import AutoTokenizer, AutoModel
 from automl.model.custom_model import CustomClassificationHead, DistilBertWithCustomHead, freeze_layers
@@ -179,19 +178,22 @@ class TextAutoML:
                 "learning_rate": self.optimizer.param_groups[0]['lr'],
             })
 
-        if save_path is not None:
-            save_path = Path(save_path) if not isinstance(save_path, Path) else save_path
-            save_path.mkdir(parents=True, exist_ok=True)
+            # Save checkpoint each epoch
+            # TODO can reduce this if it's too much
+            if save_path is not None:
+                save_path = Path(save_path) if not isinstance(save_path, Path) else save_path
+                save_path.mkdir(parents=True, exist_ok=True)
 
-            torch.save(
-                {
-                    "model_state_dict": self.model.state_dict(),
-                    "optimizer_state_dict": self.optimizer.state_dict(),
-                    "epoch": epoch,
-                },
-                save_path / "checkpoint.pth"
-            )   
+                torch.save(
+                    {
+                        "model_state_dict": self.model.state_dict(),
+                        "optimizer_state_dict": self.optimizer.state_dict(),
+                        "epoch": epoch,
+                    },
+                    save_path / "checkpoint.pth"
+                )
         torch.cuda.empty_cache()
+        # return the last epoch's val_acc
         return val_acc
 
     def _predict(self, val_loader: DataLoader):
@@ -202,15 +204,10 @@ class TextAutoML:
             for batch in val_loader:
                 inputs = {k: v.to(self.device) for k, v in batch.items() if k != 'labels'}
                 logits = self.model.predict(inputs)
-                labels.extend(batch["labels"])
-                preds.extend(torch.argmax(logits, dim=1).cpu().numpy())
-
-        if isinstance(preds, list):
-            preds = [p.item() for p in preds]
-            labels = [l.item() for l in labels]
-            return np.array(preds), np.array(labels)
-        else:
-            return preds.cpu().numpy(), labels.cpu().numpy()
+                batch_preds = torch.argmax(logits, dim=1).cpu().numpy()  # Move to CPU here
+                preds.extend(batch_preds)
+                labels.extend(batch['labels'])
+        return np.array(preds), np.array(labels)
 
 
     def predict(self, test_data: pd.DataFrame | DataLoader) -> Tuple[np.ndarray, np.ndarray]:

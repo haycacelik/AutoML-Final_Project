@@ -3,6 +3,7 @@ from pathlib import Path
 from sklearn.metrics import accuracy_score, classification_report
 import yaml
 import wandb
+from wandb.sdk.wandb_run import Run
 import time
 
 from automl.core import TextAutoML
@@ -13,6 +14,7 @@ from automl.datasets import (
     IMDBDataset,
     get_fraction_of_data,
 )
+from config.config_loader import load_config, validate_config
 
 FINAL_TEST_DATASET=...  # TBA later
 
@@ -33,34 +35,10 @@ def main_loop(
         classification_head_hidden_dim: int,
         classification_head_dropout_rate: float,
         classification_head_hidden_layers: int,
+        wandb_logger: Run,
         load_path: Path = None,
     ) -> None:
 
-    # get start time
-    start_time = time.time()
-
-    # Initialize wandb
-    wandb_run = wandb.init(
-        project="text-automl",
-        name=f"{dataset}_epochs{epochs}_lr{lr}_bs{batch_size}",  # Custom run name
-        config={
-            "dataset": dataset,
-            "seed": seed,
-            "val_percentage": val_percentage,
-            "token_length": token_length,
-            "epochs": epochs,
-            "batch_size": batch_size,
-            "lr": lr,
-            "weight_decay": weight_decay,
-            "fraction_layers_to_finetune": fraction_layers_to_finetune,
-            "data_fraction": data_fraction,
-            "classification_head_hidden_dim": classification_head_hidden_dim,
-            "classification_head_dropout_rate": classification_head_dropout_rate,
-            "classification_head_hidden_layers": classification_head_hidden_layers
-        },
-        tags=[dataset, "distilbert", "text-classification"]  # Add tags for easy filtering
-    )
-    
     match dataset:
         case "ag_news":
             dataset_class = AGNewsDataset
@@ -96,7 +74,7 @@ def main_loop(
     print(f"Train size: {len(train_df)}, Validation size: {len(val_df)}, Test size: {len(test_df)}")
     
     # Update wandb config with dataset info
-    wandb_run.config.update({
+    wandb_logger.config.update({
         "train_size": len(train_df),
         "val_size": len(val_df) if val_df is not None else 0,
         "test_size": len(test_df),
@@ -124,7 +102,7 @@ def main_loop(
         num_classes=num_classes,
         load_path=load_path,
         save_path=output_path,
-        wandb_logger=wandb_run,
+        wandb_logger=wandb_logger,
     )
 
     # Fit the AutoML model on the training and validation datasets
@@ -144,7 +122,7 @@ def main_loop(
     print(f"Saved test prediction at {output_path / 'test_preds.npy'}")
 
     # Log validation error to wandb
-    wandb_run.log({"val_error": float(val_err)})
+    wandb_logger.log({"val_error": float(val_err)})
 
     # In case of running on the final exam data, also add the predictions.npy
     # to the correct location for auto evaluation.
@@ -160,7 +138,7 @@ def main_loop(
         print(f"Accuracy on test set: {acc}")
         
         # Log test accuracy to wandb
-        wandb_run.log({"test_accuracy": acc, "test_error": float(1-acc)})
+        wandb_logger.log({"test_accuracy": acc, "test_error": float(1-acc)})
         
         with (output_path / "score.yaml").open("a+") as f:
             yaml.safe_dump({"test_err": float(1-acc)}, f)
@@ -172,6 +150,48 @@ def main_loop(
     else:
         # This is the setting for the exam dataset, you will not have access to the labels
         print(f"No test labels available for dataset '{dataset}'")
+
+
+if __name__ == "__main__":
+    config: dict = load_config("config/config.yaml")
+    validate_config(config)
+
+    dataset = "imdb"
+
+    output_path = Path(config.pop("output_path")) / f"dataset={dataset}" / f"seed={config['seed']}"
+    data_path = Path(config.pop("data_path"))
+
+    print(f"Running AutoML for dataset: {dataset}")
+
+    # Initialize wandb
+    wandb_run = wandb.init(
+        project="text-automl",
+        name=f"{dataset}_epochs{config['epochs']}_lr{config['lr']}_bs{config['batch_size']}",  # Custom run name
+        config={**config, "dataset": dataset},
+        tags=[dataset, "distilbert", "text-classification"]  # Add tags for easy filtering
+    )
+
+    # get start time
+    start_time = time.time()
+
+    main_loop(
+        dataset=dataset,
+        output_path=output_path,
+        data_path=data_path,
+        seed=config["seed"],
+        token_length=config["token_length"],
+        epochs=config["epochs"],
+        batch_size=config["batch_size"],
+        lr=config["lr"],
+        weight_decay=config["weight_decay"],
+        data_fraction=config["data_fraction"],
+        val_percentage=config["val_percentage"],
+        fraction_layers_to_finetune=config["fraction_layers_to_finetune"],
+        classification_head_hidden_dim=config["classification_head_hidden_dim"],
+        classification_head_dropout_rate=config["classification_head_dropout_rate"],
+        classification_head_hidden_layers=config["classification_head_hidden_layers"],
+        wandb_logger=wandb_run
+    )
 
     # Print total execution time
     end_time = time.time()
@@ -186,43 +206,5 @@ def main_loop(
     wandb_run.log({"total_execution_time": elapsed_time})
 
     wandb_run.finish()
-
-    return val_err
-
-
-if __name__ == "__main__":
-    # seed for reproducibility
-    seed = 42
-    dataset = "imdb"
-    print(f"Running AutoML for dataset: {dataset}")
-    output_path =  (
-            Path.cwd().absolute() / 
-            "results" / 
-            f"dataset={dataset}" / 
-            f"seed={seed}"
-        )
-    output_path = Path(output_path).absolute()
-    output_path.mkdir(parents=True, exist_ok=True)
-    data_path = Path.cwd().absolute() / "data"
-    load_path = None
-
-    main_loop(
-        dataset=dataset,
-        output_path=Path(output_path).absolute(),
-        data_path=Path(data_path).absolute(),
-        seed=seed,
-        token_length=128,
-        epochs= 10,
-        batch_size=32,
-        lr=5e-6,
-        weight_decay=0.01,
-        data_fraction=1.0, # "Subsampling of training set, in fraction (0, 1]. 1 is all the data"
-        val_percentage = 0.2,
-        fraction_layers_to_finetune=0.0,  # 1.0 means finetune all layers
-        classification_head_hidden_dim=64,
-        classification_head_dropout_rate = 0.2,
-        classification_head_hidden_layers = 4,
-        load_path = Path(load_path) if load_path is not None else None
-    )
 
 # end of file
