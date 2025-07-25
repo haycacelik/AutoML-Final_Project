@@ -11,13 +11,15 @@ class CustomClassificationHead(nn.Module):
         # First layer
         layers.append(nn.Dropout(dropout_rate))
         layers.append(nn.Linear(hidden_size, hidden_dim))
-        layers.append(getattr(nn, activation)())
+        layers.append(nn.ReLU())
+        # layers.append(getattr(nn, activation)())
         
         # Additional hidden layers
         for _ in range(num_hidden_layers - 1):
             layers.append(nn.Dropout(dropout_rate))
             layers.append(nn.Linear(hidden_dim, hidden_dim))
-            layers.append(getattr(nn, activation)())
+            layers.append(nn.ReLU())
+            # layers.append(getattr(nn, activation)())
         
         # Output layer
         layers.append(nn.Dropout(dropout_rate))

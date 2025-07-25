@@ -78,110 +78,62 @@ def main_loop(
 
     # TODO implement BOHB for the model hyperparameters, can remove the parts below and add it in the optimizer
 
-#     # TODO implement NAS
-#     from automl.automl_methods.nas import optuna_nas
+    # TODO implement NAS
+    from automl.automl_methods.nas import optuna_nas
 
-#     # Create a TPESampler with custom parameters
+    # Create a TPESampler with custom parameters
 
-#     # sampler = optuna.samplers.TPESampler(
-#     #     n_startup_trials=10,   # Number of random trials before using TPE
-#     #     gamma=0.25,            # Fraction of good trials for modeling (lower means more exploitation)
-#     #     n_ei_candidates=24,    # Number of candidates sampled when optimizing acquisition function
-#     #     multivariate=True,     # Model joint distribution of parameters
-#     #     seed=42
-#     # )
-#     objective_fn = partial(
-#     optuna_nas.objective,
-#     dataset=dataset,
-#     epochs=epochs,
-#     lr=lr,
-#     batch_size=batch_size,
-#     seed=seed,
-#     val_percentage=val_percentage,
-#     token_length=token_length,
-#     weight_decay=weight_decay,
-#     fraction_layers_to_finetune=fraction_layers_to_finetune,
-#     data_fraction=data_fraction,
-#     train_df=train_df,
-#     val_df=val_df,
-#     test_df=test_df,
-#     num_classes=num_classes,
-#     load_path=load_path,
-#     output_path=output_path
-# )
-#     study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=42))
-#     study.optimize(objective_fn, n_trials=5)
-#     print("Best score:", 1 - study.best_value)
-#     print("Best params:", study.best_params)
+    # sampler = optuna.samplers.TPESampler(
+    #     n_startup_trials=10,   # Number of random trials before using TPE
+    #     gamma=0.25,            # Fraction of good trials for modeling (lower means more exploitation)
+    #     n_ei_candidates=24,    # Number of candidates sampled when optimizing acquisition function
+    #     multivariate=True,     # Model joint distribution of parameters
+    #     seed=42
+    # )
+    objective_fn = partial(
+    optuna_nas.objective,
+    dataset=dataset,
+    epochs=epochs,
+    lr=lr,
+    batch_size=batch_size,
+    seed=seed,
+    val_percentage=val_percentage,
+    token_length=token_length,
+    weight_decay=weight_decay,
+    fraction_layers_to_finetune=fraction_layers_to_finetune,
+    data_fraction=data_fraction,
+    train_df=train_df,
+    val_df=val_df,
+    test_df=test_df,
+    num_classes=num_classes,
+    load_path=load_path,
+    output_path=output_path
+)
+    study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=42))
+    study.optimize(objective_fn, n_trials=5)
+    print("Best score:", 1 - study.best_value)
+    print("Best params:", study.best_params)
 
-#     wandb_nas_run = wandb.init(
-#         project="text-automl",
-#         name=f"nas_{dataset}_seed{seed}_best_params",
-#         config={
-#             "sampler": "TPESampler",
-#             "n_trials": 5,
-#         },
-#         tags=[dataset, "distilbert", "text-classification", "nas"]  # Add tags for easy filtering
-#     )
+    wandb_nas_run = wandb.init(
+        project="text-automl",
+        name=f"nas_{dataset}_seed{seed}_best_params",
+        config={
+            "sampler": "TPESampler",
+            "n_trials": 5,
+        },
+        tags=[dataset, "distilbert", "text-classification", "nas"]  # Add tags for easy filtering
+    )
 
-#     # TODO get the best parameters from the study, this is incorrect
-#     best_params = study.best_params
-#     hidden_dim = best_params.get("hidden_dim", classification_head_hidden_dim)
-#     dropout_rate = best_params.get("dropout_rate", classification_head_dropout_rate)
-#     hidden_layer = best_params.get("hidden_layer", classification_head_hidden_layers)
-#     activation = best_params.get("activation", classification_head_activation)
+    # TODO get the best parameters from the study, this is incorrect
+    best_params = study.best_params
+    hidden_dim = best_params.get("hidden_dim", classification_head_hidden_dim)
+    dropout_rate = best_params.get("dropout_rate", classification_head_dropout_rate)
+    hidden_layer = best_params.get("hidden_layer", classification_head_hidden_layers)
+    activation = best_params.get("activation", classification_head_activation)
 
-#     wandb_run = wandb.init(
-#         project="text-automl",
-#         name=f"nas_{dataset}_hidden_dim{hidden_dim}_dropout{dropout_rate}_hidden_layers{hidden_layer}_activation_{activation}",  # Custom run name
-#         config={
-#                 "dataset": dataset,
-#                 "seed": seed,
-#                 "val_percentage": val_percentage,
-#                 "token_length": token_length,
-#                 "epochs": epochs,
-#                 "batch_size": batch_size,
-#                 "lr": lr,
-#                 "weight_decay": weight_decay,
-#                 "fraction_layers_to_finetune": fraction_layers_to_finetune,
-#                 "data_fraction": data_fraction,
-#                 "classification_head_hidden_dim": hidden_dim,
-#                 "classification_head_dropout_rate": dropout_rate,
-#                 "classification_head_hidden_layers": hidden_layer,
-#                 "classification_head_activation": activation,
-#                 "train_size": len(train_df),
-#                 "val_size": len(val_df) if val_df is not None else 0,
-#                 "test_size": len(test_df),
-#                 "num_classes": num_classes
-#             },
-#             tags=[dataset, "distilbert", "text-classification", "nas"]  # Add tags for easy filtering
-#         )
-
-#     # Initialize the TextAutoML instance with the best parameters
-#     automl = TextAutoML(
-#         # normalized_class_weights=normalized_class_weights,
-#         normalized_class_weights=None,
-#         seed=seed,
-#         token_length=token_length,
-#         epochs=epochs,
-#         batch_size=batch_size,
-#         lr=lr,
-#         weight_decay=weight_decay,
-#         fraction_layers_to_finetune=fraction_layers_to_finetune,
-#         classification_head_hidden_dim=hidden_dim,
-#         classification_head_dropout_rate=dropout_rate,
-#         classification_head_hidden_layers=hidden_layer,
-#         classification_head_activation=activation,
-#         train_df=train_df,
-#         val_df=val_df,
-#         num_classes=num_classes,
-#         load_path=load_path,
-#         save_path=output_path,
-#         wandb_logger=wandb_run,
-#     )
     wandb_run = wandb.init(
         project="text-automl",
-        name=f"one_run_{dataset}_hd{classification_head_hidden_dim}_do{classification_head_dropout_rate}_hl{classification_head_hidden_layers}_{classification_head_activation}",  # Custom run name
+        name=f"nas_{dataset}_hidden_dim{hidden_dim}_dropout{dropout_rate}_hidden_layers{hidden_layer}_activation_{activation}",  # Custom run name
         config={
                 "dataset": dataset,
                 "seed": seed,
@@ -193,10 +145,10 @@ def main_loop(
                 "weight_decay": weight_decay,
                 "fraction_layers_to_finetune": fraction_layers_to_finetune,
                 "data_fraction": data_fraction,
-                "classification_head_hidden_dim": classification_head_hidden_dim,
-                "classification_head_dropout_rate": classification_head_dropout_rate,
-                "classification_head_hidden_layers": classification_head_hidden_layers,
-                "classification_head_activation": classification_head_activation,
+                "classification_head_hidden_dim": hidden_dim,
+                "classification_head_dropout_rate": dropout_rate,
+                "classification_head_hidden_layers": hidden_layer,
+                "classification_head_activation": activation,
                 "train_size": len(train_df),
                 "val_size": len(val_df) if val_df is not None else 0,
                 "test_size": len(test_df),
@@ -216,10 +168,10 @@ def main_loop(
         lr=lr,
         weight_decay=weight_decay,
         fraction_layers_to_finetune=fraction_layers_to_finetune,
-        classification_head_hidden_dim=classification_head_hidden_dim,
-        classification_head_dropout_rate=classification_head_dropout_rate,
-        classification_head_hidden_layers=classification_head_hidden_layers,
-        classification_head_activation=classification_head_activation,
+        classification_head_hidden_dim=hidden_dim,
+        classification_head_dropout_rate=dropout_rate,
+        classification_head_hidden_layers=hidden_layer,
+        classification_head_activation=activation,
         train_df=train_df,
         val_df=val_df,
         num_classes=num_classes,
