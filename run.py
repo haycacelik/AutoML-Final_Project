@@ -37,7 +37,7 @@ def main_loop(
         classification_head_hidden_layers: int,
         wandb_logger: Run,
         load_path: Path = None,
-    ) -> None:
+    ) -> float:
 
     match dataset:
         case "ag_news":
@@ -150,6 +150,8 @@ def main_loop(
     else:
         # This is the setting for the exam dataset, you will not have access to the labels
         print(f"No test labels available for dataset '{dataset}'")
+
+    return val_err
 
 
 if __name__ == "__main__":
