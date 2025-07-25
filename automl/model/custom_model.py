@@ -2,21 +2,22 @@ import torch.nn as nn
 
 class CustomClassificationHead(nn.Module):
     """Custom classification head with configurable architecture."""
-    def __init__(self, hidden_size, num_classes, dropout_rate, num_hidden_layers=1, hidden_dim=None):
+    def __init__(self, hidden_size, num_classes, dropout_rate, num_hidden_layers=1, hidden_dim=None, activation='ReLU'):
+        """ Initializes the custom classification head."""
         super().__init__()
-        
+
         layers = []
         
         # First layer
         layers.append(nn.Dropout(dropout_rate))
         layers.append(nn.Linear(hidden_size, hidden_dim))
-        layers.append(nn.ReLU())
+        layers.append(getattr(nn, activation)())
         
         # Additional hidden layers
         for _ in range(num_hidden_layers - 1):
             layers.append(nn.Dropout(dropout_rate))
             layers.append(nn.Linear(hidden_dim, hidden_dim))
-            layers.append(nn.ReLU())
+            layers.append(getattr(nn, activation)())
         
         # Output layer
         layers.append(nn.Dropout(dropout_rate))

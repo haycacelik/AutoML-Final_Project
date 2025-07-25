@@ -28,6 +28,7 @@ class TextAutoML:
         classification_head_hidden_dim: int,
         classification_head_dropout_rate: float,
         classification_head_hidden_layers: int,
+        classification_head_activation: str,  # Default activation, can be changed later
         train_df: pd.DataFrame,
         val_df: pd.DataFrame,
         num_classes: int,
@@ -38,18 +39,19 @@ class TextAutoML:
         self.seed = seed
         np.random.seed(seed)
         torch.manual_seed(seed)
-
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.token_length = token_length
         self.epochs = epochs
         self.batch_size = batch_size
         self.lr = lr
+        print("---learning rate", self.lr)
         self.weight_decay = weight_decay
         self.normalized_class_weights = normalized_class_weights
         self.fraction_layers_to_finetune = fraction_layers_to_finetune
         self.classification_head_hidden_dim = classification_head_hidden_dim
         self.classification_head_dropout_rate = classification_head_dropout_rate
         self.classification_head_hidden_layers = classification_head_hidden_layers
+        self.classification_head_activation = classification_head_activation
         self.train_texts = train_df['text'].tolist()
         self.train_labels = train_df['label'].tolist()
         self.val_texts = val_df['text'].tolist()
@@ -78,7 +80,8 @@ class TextAutoML:
             num_classes=self.num_classes,
             dropout_rate=self.classification_head_dropout_rate,
             num_hidden_layers=self.classification_head_hidden_layers,
-            hidden_dim=self.classification_head_hidden_dim
+            hidden_dim=self.classification_head_hidden_dim,
+            activation=self.classification_head_activation
         )
         # Combine base model and custom head
         self.model = DistilBertWithCustomHead(self.base_model, self.custom_head)
@@ -87,7 +90,13 @@ class TextAutoML:
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         wandb_logger.config.update({"optimizer": "AdamW"})
 
-    def fit(self):
+        for name, param in self.model.named_parameters():
+            if param.requires_grad:
+                print("Trainable:", name, param.shape)
+
+
+
+    def fit(self, last_model: bool = False) -> float:
         """
         Fits a model to the given dataset.
         """
@@ -105,6 +114,8 @@ class TextAutoML:
 
         assert dataset is not None, f"`dataset` cannot be None here!"
 
+        # create the custom head
+
         # Training and validating
         val_acc = self._train_loop(
             train_loader,
@@ -112,6 +123,10 @@ class TextAutoML:
             load_path=self.load_path,
             save_path=self.save_path,
         )
+
+        if not last_model:
+            #turn off wandb
+            self.wandb_logger.finish()
 
         return 1 - val_acc
 
@@ -122,6 +137,7 @@ class TextAutoML:
         load_path: Path=None,
         save_path: Path=None,
     ):
+        print("---Starting training loop...")
         # TODO still have not checked if it makes a big difference, should check it with amazon
         if self.normalized_class_weights is not None:
             class_weights = torch.tensor(self.normalized_class_weights, dtype=torch.float).to(self.device)
@@ -150,6 +166,7 @@ class TextAutoML:
 
                 inputs = {k: v.to(self.device) for k, v in batch.items()}
                 loss, logits = self.model.forward(inputs, criterion)  # Forward pass
+                print(loss)
                 labels = inputs['labels']
                 loss.backward()
                 self.optimizer.step()
