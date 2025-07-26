@@ -13,3 +13,4 @@ data/
 *logs/
 .base
 wandb
+conda_command
