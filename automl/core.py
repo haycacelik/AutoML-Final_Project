@@ -10,6 +10,7 @@ from typing import Tuple
 from wandb.sdk.wandb_run import Run
 from transformers import AutoTokenizer, AutoModel
 from automl.model.custom_model import CustomClassificationHead, DistilBertWithCustomHead, freeze_layers
+from ray import tune
 
 model_name = 'distilbert-base-uncased'
 
@@ -30,9 +31,9 @@ class TextAutoML:
         train_df: pd.DataFrame,
         val_df: pd.DataFrame,
         num_classes: int,
-        load_path: Path,
         save_path: Path,
-        wandb_logger: Run
+        wandb_logger: Run,
+        load_path: Path = None,
     ):
         self.seed = seed
         np.random.seed(seed)
@@ -168,6 +169,8 @@ class TextAutoML:
             val_preds, val_labels = self._predict(val_loader)
             val_acc = accuracy_score(val_labels, val_preds)
             print(f"---Epoch {epoch + 1}, Validation Accuracy: {val_acc:.4f}")
+
+            tune.report(metrics={"val_acc": val_acc})
             
             # Log training and validation accuracy to wandb
             self.wandb_logger.log({
