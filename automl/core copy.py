@@ -11,6 +11,8 @@ from wandb.sdk.wandb_run import Run
 from transformers import AutoTokenizer
 from automl.model.custom_model import  DistilBertWithCustomHead
 
+
+
 model_name = 'distilbert-base-uncased'
 
 class TextAutoML:
@@ -140,6 +142,11 @@ class TextAutoML:
             save_path=self.save_path,
         )
 
+        # Clear data loaders and datasets to free memory
+        del train_loader, val_loader, dataset, _dataset
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
         # if this is a trial model, finish the wandb run, because outside we only do the test run,
         # and if this is not the chosen last model we dont do that
         if trial_number != -1 and self.wandb_logger:
@@ -155,6 +162,11 @@ class TextAutoML:
         save_path: Path,
     ):
         print("---Starting training loop...")
+        
+        # Clear CUDA cache before starting training
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
         # TODO still have not checked if it makes a big difference, should check it with amazon
         if self.normalized_class_weights is not None:
             class_weights = torch.tensor(self.normalized_class_weights, dtype=torch.float).to(self.device)
@@ -174,7 +186,7 @@ class TextAutoML:
             train_preds = []
             train_labels_list = []
             
-            for batch in train_loader:
+            for batch_idx, batch in enumerate(train_loader):
                 self.model.train()
                 self.optimizer.zero_grad()
 
@@ -190,16 +202,33 @@ class TextAutoML:
                     preds = torch.argmax(logits, dim=1)
                     train_preds.extend(preds.cpu().numpy())
                     train_labels_list.extend(labels.cpu().numpy())
+                
+                # Clear variables to free GPU memory
+                del inputs, loss, logits, labels, preds
+                
+                # Clear CUDA cache every 10 batches to balance memory management and performance
+                if batch_idx % 10 == 0 and torch.cuda.is_available():
+                    torch.cuda.empty_cache()
 
             # Calculate training accuracy
             train_acc = accuracy_score(train_labels_list, train_preds)
             print(f"---Epoch {epoch + 1}, Loss: {total_loss:.4f}, Train Accuracy: {train_acc:.4f}")
+
+            # Clear training data from memory
+            del train_preds, train_labels_list
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
             # Calculate validation accuracy
             val_preds, val_labels = self._predict(val_loader)
             val_acc = accuracy_score(val_labels, val_preds)
             validation_results.append(val_acc)
             print(f"---Epoch {epoch + 1}, Validation Accuracy: {val_acc:.4f}")
+
+            # Clear validation data from memory
+            del val_preds, val_labels
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
             # Log training and validation accuracy to wandb
             if self.wandb_logger:
@@ -230,7 +259,8 @@ class TextAutoML:
         if save_path is not None:
             self.model.save_model(save_path, f"epoch_{epoch + 1}_acc_{val_acc:.4f}")
 
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         return val_acc
 
     def _predict(self, val_loader: DataLoader):
@@ -238,11 +268,18 @@ class TextAutoML:
         preds = []
         labels = []
         with torch.no_grad():
-            for batch in val_loader:
+            for batch_idx, batch in enumerate(val_loader):
                 inputs = {k: v.to(self.device) for k, v in batch.items() if k != 'labels'}
                 logits = self.model.predict(inputs)
                 labels.extend(batch["labels"])
                 preds.extend(torch.argmax(logits, dim=1).cpu().numpy())
+                
+                # Clear batch data from GPU memory
+                del inputs, logits
+                
+                # Clear CUDA cache every 5 batches during validation
+                if batch_idx % 5 == 0 and torch.cuda.is_available():
+                    torch.cuda.empty_cache()
 
         if isinstance(preds, list):
             preds = [p.item() for p in preds]

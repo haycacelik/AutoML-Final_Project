@@ -12,47 +12,23 @@ import wandb
 # from scipy import stats
 
 
-def objective(trial, dataset, epochs, lr, batch_size, seed, val_percentage, token_length,
-                     weight_decay, fraction_layers_to_finetune, data_fraction,
-                     train_df, val_df, test_df, num_classes, load_path, output_path, normalized_class_weights):
+def objective(trial, epochs, lr, batch_size, seed, token_length,
+                     weight_decay,
+                     train_df, val_df, num_classes, output_path, normalized_class_weights, wandb_run):
     trial_id = trial.number
 
-    hidden_dim = trial.suggest_categorical(f"hidden_size", [64, 128, 256, 512])
+    hidden_dim = trial.suggest_categorical(f"hidden_size", [64, 128, 256])
     activation = trial.suggest_categorical("activation_function", ["ReLU", "GELU", "LeakyReLU"])
     # use_norm = trial.suggest_categorical("use_normalization", [True, False])
+    # i want to add fine tuning here as well but its always going to be better, so maybe we should turn this into a mutli objective
+    fraction_layers_to_finetune = trial.suggest_float("fraction_layers_to_finetune", 0.0, 1.0)
+    # fraction_layers_to_finetune = 0.0  # Fixed for now, can be tuned later
     dropout_rate = trial.suggest_float("dropout_rate", 0.0, 0.5)
     hidden_layer = trial.suggest_int("hidden_layers", 1, 4)
+    use_layer_norm = trial.suggest_categorical("use_layer_norm", [True, False])
 
-    print(f"Running trial {trial_id} with hidden_dim={hidden_dim}, activation={activation}, dropout_rate={dropout_rate}, hidden_layer={hidden_layer}")
+    print(f"Running trial {trial_id} with hidden_dim={hidden_dim}, activation={activation}, dropout_rate={dropout_rate}, hidden_layer={hidden_layer}, use_layer_norm={use_layer_norm}")
 
-
-    #TODO can i give each run a wandb name with an int that show the loop
-    wandb_run = wandb.init(
-        project="text-automl",
-        name=f"trial_{trial_id}_hd{hidden_dim}_do{dropout_rate}_hl{hidden_layer}_{activation}",  # Custom run name
-        config={
-                "dataset": dataset,
-                "seed": seed,
-                "val_percentage": val_percentage,
-                "token_length": token_length,
-                "epochs": epochs,
-                "batch_size": batch_size,
-                "lr": lr,
-                "weight_decay": weight_decay,
-                "fraction_layers_to_finetune": fraction_layers_to_finetune,
-                "data_fraction": data_fraction,
-                "classification_head_hidden_dim": hidden_dim,
-                "classification_head_dropout_rate": dropout_rate,
-                "classification_head_hidden_layers": hidden_layer,
-                "classification_head_activation": activation,
-                "train_size": len(train_df),
-                "val_size": len(val_df) if val_df is not None else 0,
-                "test_size": len(test_df),
-                "num_classes": num_classes
-            },
-            tags=[dataset, "distilbert", "text-classification", "nas"]  # Add tags for easy filtering
-        )
-    
     automl = TextAutoML(
         normalized_class_weights=normalized_class_weights,
         seed=seed,
@@ -72,7 +48,8 @@ def objective(trial, dataset, epochs, lr, batch_size, seed, val_percentage, toke
         classification_head_dropout_rate=dropout_rate,
         classification_head_hidden_layers=hidden_layer,
         classification_head_activation=activation,
-        num_classes=num_classes
+        num_classes=num_classes,
+        use_layer_norm=use_layer_norm
     )
 
     val_err = automl.fit()

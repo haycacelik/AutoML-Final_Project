@@ -4,8 +4,20 @@ from sklearn.metrics import accuracy_score, classification_report
 import yaml
 import wandb
 import time
-# import optuna
-# from functools import partial
+print("Starting the AutoML run...")  # Debugging line to check if the script starts correctly
+import optuna
+print("Optuna imported successfully")  # Debugging line to check if Optuna imports correctly
+from functools import partial
+
+from optuna.visualization import plot_contour
+from optuna.visualization import plot_edf
+from optuna.visualization import plot_intermediate_values
+from optuna.visualization import plot_optimization_history
+from optuna.visualization import plot_parallel_coordinate
+from optuna.visualization import plot_param_importances
+from optuna.visualization import plot_rank
+from optuna.visualization import plot_slice
+from optuna.visualization import plot_timeline
 
 from automl.core import TextAutoML
 from automl.datasets import (
@@ -17,6 +29,9 @@ from automl.datasets import (
 )
 
 FINAL_TEST_DATASET=...  # TBA later
+
+# import os
+# os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
 
 def main_loop(
@@ -30,13 +45,7 @@ def main_loop(
         batch_size: int,
         lr: float,
         weight_decay: float,
-        fraction_layers_to_finetune: float,
         data_fraction: float,
-        classification_head_hidden_dim: int,
-        classification_head_dropout_rate: float,
-        classification_head_hidden_layers: int,
-        classification_head_activation: str,
-        load_path: Path = None,
     ) -> None:
 
     # get start time
@@ -78,93 +87,119 @@ def main_loop(
 
     # TODO implement BOHB for the model hyperparameters, can remove the parts below and add it in the optimizer
 
-    # # TODO implement NAS
-    # from automl.automl_methods.nas.optuna_nas import objective, visualize_kernels, create_tpe_animation, run_nas_with_visualization
+    # TODO implement NAS
+    from automl.automl_methods.nas.optuna_nas import objective
+    n_trials = 15  # Number of trials to run
+    print(f"Running NAS with {n_trials} trials")
 
-    # # Create a TPESampler with custom parameters
-    # # sampler = optuna.samplers.TPESampler(
-    # #     n_startup_trials=10,   # Number of random trials before using TPE
-    # #     gamma=0.25,            # Fraction of good trials for modeling (lower means more exploitation)
-    # #     n_ei_candidates=24,    # Number of candidates sampled when optimizing acquisition function
-    # #     multivariate=True,     # Model joint distribution of parameters
-    # #     seed=42
-    # # )
-
-    # for i in range (0,10):
-    #     nas_study_name = f"nas_{i+1}"
-    #     # check if folder exists
-    #     nas_study_path = output_path / nas_study_name
-    #     if not nas_study_path.exists():
-    #         nas_study_path.mkdir(parents=True, exist_ok=True)
-    #         break
-    #     if i == 9:
-    #         raise ValueError(f"You already have 10 in {output_path}, please remove them.")
-
-    # objective_fn = partial(
-    #     objective,
-    #     dataset=dataset,
-    #     epochs=epochs,
-    #     lr=lr,
-    #     batch_size=batch_size,
-    #     seed=seed,
-    #     val_percentage=val_percentage,
-    #     token_length=token_length,
-    #     weight_decay=weight_decay,
-    #     fraction_layers_to_finetune=fraction_layers_to_finetune,
-    #     data_fraction=data_fraction,
-    #     train_df=train_df,
-    #     val_df=val_df,
-    #     test_df=test_df,
-    #     num_classes=num_classes,
-    #     load_path=load_path,
-    #     output_path=nas_study_path
-    # )
-        
-    # study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=42))
-    # study.optimize(objective_fn, n_trials=5, callbacks=[visualize_kernels])
-    # print("Best score:", 1 - study.best_value)
-    # print("Best params:", study.best_params)
+    for i in range (0,10):
+        nas_study_name = f"nas_{i+1}"
+        # check if folder exists
+        nas_study_path = output_path / nas_study_name
+        if not nas_study_path.exists():
+            nas_study_path.mkdir(parents=True, exist_ok=True)
+            break
+        if i == 9:
+            raise ValueError(f"You already have 10 in {output_path}, please remove some.")
 
     # a wand just for the NAS run, might no need it
-    # wandb_nas_run = wandb.init(
-    #     project="text-automl",
-    #     name=f"nas_{dataset}_seed{seed}_best_params",
-    #     config={
-    #         "sampler": "TPESampler",
-    #         "n_trials": 10,
-    #     },
-    #     tags=[dataset, "distilbert", "text-classification", "nas"]  # Add tags for easy filtering
-    # )
-    # trial_id = study.best_trial.number
-
-    # TODO load the best model with the best parameters
-
-    # for running it once
-    wandb_run = wandb.init(
+    wandb_nas_run = wandb.init(
         project="text-automl",
-        name=f"nas_{dataset}_hm{classification_head_activation}_do{classification_head_dropout_rate}_hl{classification_head_hidden_layers}_{classification_head_activation}",  # Custom run name
+        name=f"nas_{dataset}_seed{seed}_{nas_study_name}",
         config={
-                "dataset": dataset,
-                "seed": seed,
-                "val_percentage": val_percentage,
-                "token_length": token_length,
-                "epochs": epochs,
-                "batch_size": batch_size,
-                "lr": lr,
-                "weight_decay": weight_decay,
-                "fraction_layers_to_finetune": fraction_layers_to_finetune,
-                "data_fraction": data_fraction,
-                "classification_head_hidden_dim": classification_head_hidden_dim,
-                "classification_head_dropout_rate": classification_head_dropout_rate,
-                "classification_head_hidden_layers": classification_head_hidden_layers,
-                "classification_head_activation": classification_head_activation,
-                "train_size": len(train_df),
-                "val_size": len(val_df) if val_df is not None else 0,
-                "test_size": len(test_df),
-                "num_classes": num_classes
-            },
-            tags=[dataset, "distilbert", "text-classification", "nas"]  # Add tags for easy filtering
-        )
+            "sampler": "TPESampler",
+            "n_trials": n_trials,
+            "dataset": dataset,
+            "seed": seed,
+            "val_percentage": val_percentage,
+            "token_length": token_length,
+            "epochs": epochs,
+            "batch_size": batch_size,
+            "lr": lr,
+            "weight_decay": weight_decay,
+            "data_fraction": data_fraction,
+            "train_size": len(train_df),
+            "val_size": len(val_df) if val_df is not None else 0,
+            "test_size": len(test_df),
+            "num_classes": num_classes
+        },
+        tags=[dataset, "distilbert", "text-classification", "nas"]  # Add tags for easy filtering
+    )
+
+    # Create a TPESampler with custom parameters
+    sampler = optuna.samplers.TPESampler(
+        n_startup_trials=8,   # Number of random trials before using TPE
+        seed=42,
+        multivariate=True,  # Enable multivariate sampling
+    )
+
+    objective_fn = partial(
+        objective,
+        epochs=epochs,
+        lr=lr,
+        batch_size=batch_size,
+        seed=seed,
+        token_length=token_length,
+        weight_decay=weight_decay,
+        train_df=train_df,
+        val_df=val_df,
+        num_classes=num_classes,
+        output_path=nas_study_path,
+        normalized_class_weights=normalized_class_weights,
+        wandb_run=wandb_nas_run
+    )
+        
+    study = optuna.create_study(direction="minimize", sampler=sampler)
+    # study.optimize(objective_fn, n_trials=5, callbacks=[visualize_kernels])
+    study.optimize(objective_fn, n_trials=n_trials)
+
+    val_err = 1 - study.best_value
+    print("Best score:", 1 - study.best_value)
+    print("Best params:", study.best_params)
+
+  
+    # get the path of the best model
+    trial_id = study.best_trial.number
+    print(f"Best trial ID: {trial_id}")
+    folder = nas_study_path / f"trial_{trial_id}"
+    # get the files in the folder
+    files = list(folder.glob("*.pth"))
+    for file in files:
+        # get the file that ents with .pth
+        if file.suffix == ".pth":
+            model_path = file
+            print(f"Best model found: {model_path}")
+            break
+    else:
+        raise ValueError(f"No model found in {folder} with .pth suffix.")
+
+    # # for running it once
+    # wandb_run = wandb.init(
+    #     project="text-automl",
+    #     name=f"nas_{dataset}_hm{classification_head_activation}_do{classification_head_dropout_rate}_hl{classification_head_hidden_layers}_{classification_head_activation}",  # Custom run name
+    #     config={
+    #             "dataset": dataset,
+    #             "seed": seed,
+    #             "val_percentage": val_percentage,
+    #             "token_length": token_length,
+    #             "epochs": epochs,
+    #             "batch_size": batch_size,
+    #             "lr": lr,
+    #             "weight_decay": weight_decay,
+    #             "fraction_layers_to_finetune": 0.0,
+    #             "data_fraction": data_fraction,
+    #             "classification_head_hidden_dim": 64,
+    #             "classification_head_dropout_rate": 0.2,
+    #             "classification_head_hidden_layers": 4,
+    #             "classification_head_activation": 'LeakyReLU',
+    #             "train_size": len(train_df),
+    #             "val_size": len(val_df) if val_df is not None else 0,
+    #             "test_size": len(test_df),
+    #             "num_classes": num_classes
+    #         },
+    #         tags=[dataset, "distilbert", "text-classification", "nas"]  # Add tags for easy filtering
+    #     )
+
 
     # Initialize the TextAutoML instance with the best parameters
     automl = TextAutoML(
@@ -179,24 +214,33 @@ def main_loop(
         train_df=train_df,
         val_df=val_df,
         save_path=output_path,
-        wandb_logger=wandb_run,
+        wandb_logger=None,
     )
-    # automl.create_model(
-    #     fraction_layers_to_finetune=fraction_layers_to_finetune,
-    #     classification_head_hidden_dim=classification_head_hidden_dim,
-    #     classification_head_dropout_rate=classification_head_dropout_rate,
-    #     classification_head_hidden_layers=classification_head_hidden_layers,
-    #     classification_head_activation=classification_head_activation,
-    #     num_classes=num_classes
-    # )
-    # if you want to load a pre-trained model, you can do it here
-    automl.load_model(model_path=r"/work/dlclarge2/celikh-nr1-ayca/AutoML-Final_Project/results/dataset=imdb/seed=42/epoch_10_acc_0.8564.pth.pth")
+    # if you want to create a new model to train
+    automl.create_model(
+        fraction_layers_to_finetune=0.0,
+        num_classes=num_classes,
+        classification_head_hidden_dim=64,
+        classification_head_dropout_rate=0.2,
+        classification_head_hidden_layers=4,  # [1,4]
+        classification_head_activation='LeakyReLU',  # Default activation, can be changed later
+    )
 
-    # Fit the AutoML model on the training and validation datasets
-    # last model is true if it is the model that will be used for the final test
-    val_err = automl.fit()
+    # if you want to load a pre-trained model
+    automl.load_model(model_path=model_path)
 
-    # TODO recreate the model with the best parameters for NAS
+    # Fit the AutoML model on the training and validation datasets, for single run
+    # val_err = automl.fit()
+
+    # Print total execution time
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    # turn it to minute and seconds
+    elapsed_minutes = elapsed_time // 60
+    elapsed_seconds = elapsed_time % 60
+    print(f"Total execution time: {elapsed_minutes:.0f} minutes and {elapsed_seconds:.2f} seconds")
+    # Log total execution time to wandb
+    # wandb_nas_run.log({"total_execution_time": elapsed_time})
 
     # Predict on the test set
     test_preds, test_labels = automl.predict(test_df)
@@ -226,9 +270,9 @@ def main_loop(
     if not np.isnan(test_labels).any():
         acc = accuracy_score(test_labels, test_preds)
         print(f"Accuracy on test set: {acc}")
-        
-        # Log test accuracy to wandb
-        wandb_run.log({"test_accuracy": acc, "test_error": float(1-acc)})
+
+        # Log test accuracy to wandb, only for training one model
+        # wandb_run.log({"test_accuracy": acc, "test_error": float(1-acc)})
         
         with (output_path / "score.yaml").open("a+") as f:
             yaml.safe_dump({"test_err": float(1-acc)}, f)
@@ -241,20 +285,26 @@ def main_loop(
         # This is the setting for the exam dataset, you will not have access to the labels
         print(f"No test labels available for dataset '{dataset}'")
 
-    # Print total execution time
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    # turn it to minute and seconds
-    elapsed_minutes = elapsed_time // 60
-    elapsed_seconds = elapsed_time % 60
-    print(f"Total execution time: {elapsed_minutes:.0f} minutes and {elapsed_seconds:.2f} seconds")
-
     # Log total execution time to wandb
     # TODO add it to the results file, also make the results file better.
-    wandb_run.log({"total_execution_time": elapsed_time})
+    # wandb_run.log({"total_execution_time": elapsed_time})
 
-    wandb_run.finish()
+    wandb_nas_run.finish()
 
+    plot_optimization_history(study).write_image(nas_study_path / "optimization_history.png")
+    plot_contour(study).write_image(nas_study_path / "contour.png")
+    plot_edf(study).write_image(nas_study_path / "edf.png")
+    plot_intermediate_values(study).write_image(nas_study_path / "intermediate.png")    
+    plot_optimization_history(study).write_image(nas_study_path / "optimization_history.png")
+    plot_parallel_coordinate(study).write_image(nas_study_path / "parallel_coordinate.png")
+    plot_param_importances(study).write_image(nas_study_path / "param_importances.png")
+    plot_rank(study).write_image(nas_study_path / "rank.png")
+    plot_slice(study).write_image(nas_study_path / "slice.png")
+    plot_param_importances(
+    study, target=lambda t: t.duration.total_seconds(), target_name="duration"
+).write_image(nas_study_path / "param_importances_duration.png")
+    plot_timeline(study).write_image(nas_study_path / "timeline.png")
+    
     return val_err
 
 
@@ -272,7 +322,6 @@ if __name__ == "__main__":
     output_path = Path(output_path).absolute()
     output_path.mkdir(parents=True, exist_ok=True)
     data_path = Path.cwd().absolute() / "data"
-    load_path = None
 
     main_loop(
         dataset=dataset,
@@ -280,18 +329,12 @@ if __name__ == "__main__":
         data_path=Path(data_path).absolute(),
         seed=seed,
         token_length=128,
-        epochs= 10,
-        batch_size=32,
-        lr=1e-5,
+        epochs= 15,
+        batch_size=16,  # Reduced from 32 to avoid CUDA memory errors
+        lr=5e-5,
         weight_decay=0.01,
         data_fraction=1.0, # "Subsampling of training set, in fraction (0, 1]. 1 is all the data"
         val_percentage = 0.2,
-        fraction_layers_to_finetune=0.0,  # 1.0 means finetune all layers
-        classification_head_hidden_dim=64,
-        classification_head_dropout_rate = 0.2,
-        classification_head_hidden_layers = 4, # [1,4]
-        classification_head_activation = 'LeakyReLU',  # Default activation, can be changed later
-        load_path = Path(load_path) if load_path is not None else None
     )
 
 # end of file

@@ -6,7 +6,7 @@ from transformers import AutoModel
 
 class CustomClassificationHead(nn.Module):
     """Custom classification head with configurable architecture."""
-    def __init__(self, hidden_size, num_classes, dropout_rate, num_hidden_layers=1, hidden_dim=None, activation='ReLU'):
+    def __init__(self, hidden_size, num_classes, dropout_rate, num_hidden_layers=1, hidden_dim=None, activation='ReLU', use_layer_norm=False):
         """ Initializes the custom classification head."""
         super().__init__()
 
@@ -18,9 +18,12 @@ class CustomClassificationHead(nn.Module):
         layers.append(getattr(nn, activation)())
         
         # Additional hidden layers
-        for _ in range(num_hidden_layers - 1):
+        for i in range(num_hidden_layers - 1):
             layers.append(nn.Dropout(dropout_rate))
             layers.append(nn.Linear(hidden_dim, hidden_dim))
+            # do it for only last layer
+            if use_layer_norm and i == num_hidden_layers - 2:
+                layers.append(nn.LayerNorm(hidden_dim))
             layers.append(getattr(nn, activation)())
         
         # Output layer
@@ -71,7 +74,7 @@ def freeze_layers(model, fraction_layers_to_finetune: float=1.0) -> None:
 
 class DistilBertWithCustomHead(nn.Module):
     """DistilBERT model with custom classification head."""
-    def __init__(self, base_model_name, num_classes, dropout_rate, num_hidden_layers, hidden_dim, activation, fraction_layers_to_finetune):
+    def __init__(self, base_model_name, num_classes, dropout_rate, num_hidden_layers, hidden_dim, activation, fraction_layers_to_finetune, use_layer_norm):
         """ Initializes the DistilBERT model with a custom classification head."""
         super().__init__()
         
@@ -83,6 +86,7 @@ class DistilBertWithCustomHead(nn.Module):
         self.classification_head_hidden_dim = hidden_dim
         self.classification_head_activation = activation
         self.fraction_layers_to_finetune = fraction_layers_to_finetune
+        self.use_layer_norm = use_layer_norm
 
         # get the Pre trained DistilBERT model
         self.pre_trained_model = AutoModel.from_pretrained(base_model_name)
@@ -98,7 +102,8 @@ class DistilBertWithCustomHead(nn.Module):
             dropout_rate=self.classification_head_dropout_rate,
             num_hidden_layers=self.classification_head_hidden_layers,
             hidden_dim=self.classification_head_hidden_dim,
-            activation=self.classification_head_activation
+            activation=self.classification_head_activation,
+            use_layer_norm=use_layer_norm
         )
         
     def forward(self, inputs, loss_function):
@@ -129,8 +134,20 @@ class DistilBertWithCustomHead(nn.Module):
     def save_model(self, save_path, filename):
         """Save the complete model including architecture and weights."""
         save_path = Path(save_path)
-        save_path.mkdir(parents=True, exist_ok=True)
-        
+        best_model_save_path = save_path / "best_model"
+        if not best_model_save_path.exists():
+            best_model_save_path.mkdir(parents=True, exist_ok=True)
+
+        # If there are already files in the directory, move them to an "old" folder
+        if any(best_model_save_path.iterdir()):
+            # move the existing files to a old folder
+            old_folder = save_path / "old"
+            if not old_folder.exists():
+                old_folder.mkdir(parents=True, exist_ok=True)
+            # Convert to list to avoid modifying directory while iterating
+            for file in list(best_model_save_path.iterdir()):
+                file.rename(old_folder / file.name)
+
         # Save the complete model state dict
         model_state = {
             'model_state_dict': self.state_dict(),
@@ -142,11 +159,12 @@ class DistilBertWithCustomHead(nn.Module):
                 'hidden_dim': self.classification_head_hidden_dim,
                 'activation': self.classification_head_activation,
                 'fraction_layers_to_finetune': self.fraction_layers_to_finetune,
+                'use_layer_norm': self.use_layer_norm
             }
         }
         
         # Save model
-        model_path = save_path / f"{filename}.pth"
+        model_path = best_model_save_path / f"{filename}.pth"
         torch.save(model_state, model_path)
         
         # Also save just the config as JSON for easy reading
@@ -175,7 +193,8 @@ class DistilBertWithCustomHead(nn.Module):
             num_hidden_layers=model_arch['num_hidden_layers'],
             hidden_dim=model_arch['hidden_dim'],
             activation=model_arch['activation'],
-            fraction_layers_to_finetune=model_arch.get('fraction_layers_to_finetune', 1.0)
+            fraction_layers_to_finetune=model_arch.get('fraction_layers_to_finetune', 1.0),
+            use_layer_norm=model_arch.get('use_layer_norm', False)
         )
         
         # Load the weights
