@@ -149,7 +149,12 @@ def main_loop(
         wandb_run=wandb_nas_run
     )
         
-    study = optuna.create_study(direction="minimize", sampler=sampler)
+    study = optuna.create_study(
+        direction="minimize",
+        sampler=sampler,
+        study_name=nas_study_name,
+        storage=f"sqlite:///{nas_study_path / 'study.db'}",
+        )
     # study.optimize(objective_fn, n_trials=5, callbacks=[visualize_kernels])
     study.optimize(objective_fn, n_trials=n_trials)
 
@@ -157,11 +162,12 @@ def main_loop(
     print("Best score:", 1 - study.best_value)
     print("Best params:", study.best_params)
 
+    # TODO load and do it, but you have to fix the saved model places.
   
     # get the path of the best model
     trial_id = study.best_trial.number
     print(f"Best trial ID: {trial_id}")
-    folder = nas_study_path / f"trial_{trial_id}"
+    folder = nas_study_path / f"trial_{trial_id}" / "best_model"
     # get the files in the folder
     files = list(folder.glob("*.pth"))
     for file in files:
@@ -302,7 +308,7 @@ def main_loop(
     plot_slice(study).write_image(nas_study_path / "slice.png")
     plot_param_importances(
     study, target=lambda t: t.duration.total_seconds(), target_name="duration"
-).write_image(nas_study_path / "param_importances_duration.png")
+    ).write_image(nas_study_path / "param_importances_duration.png")
     plot_timeline(study).write_image(nas_study_path / "timeline.png")
     
     return val_err

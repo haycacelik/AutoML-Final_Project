@@ -121,13 +121,14 @@ class DistilBertWithCustomHead(nn.Module):
         return loss, logits
     
     def predict(self, inputs):
-        input_ids, attention_mask = inputs['input_ids'], inputs['attention_mask']
-        outputs = self.pre_trained_model(input_ids=input_ids, attention_mask=attention_mask)
-        sequence_output = outputs.last_hidden_state
-        
-        # Use [CLS] token representation
-        cls_output = sequence_output[:, 0]
-        logits = self.classifier(cls_output)
+        with torch.no_grad():
+            input_ids, attention_mask = inputs['input_ids'], inputs['attention_mask']
+            outputs = self.pre_trained_model(input_ids=input_ids, attention_mask=attention_mask)
+            sequence_output = outputs.last_hidden_state
+            
+            # Use [CLS] token representation
+            cls_output = sequence_output[:, 0]
+            logits = self.classifier(cls_output)
 
         return logits
     
@@ -168,9 +169,12 @@ class DistilBertWithCustomHead(nn.Module):
         torch.save(model_state, model_path)
         
         # Also save just the config as JSON for easy reading
-        config_path = save_path / f"{filename}_config.json"
+        config_path = best_model_save_path / f"{filename}_config.json"
         with open(config_path, 'w') as f:
             json.dump(model_state['model_architecture'], f, indent=2)
+        
+        # Clean up model_state to free memory
+        del model_state
         
         print(f"Model saved to {model_path}")
         print(f"Config saved to {config_path}")
@@ -200,6 +204,9 @@ class DistilBertWithCustomHead(nn.Module):
         # Load the weights
         model.load_state_dict(checkpoint['model_state_dict'])
         model.to(device)
+        
+        # Clean up checkpoint to free memory
+        del checkpoint
         
         print(f"Model loaded from {model_path}")
         print(f"Architecture: {model_arch['base_model_name']} + Custom Head")
