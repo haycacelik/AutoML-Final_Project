@@ -115,7 +115,7 @@ class TextAutoML:
             elif isinstance(module, torch.nn.LayerNorm):
                 print("LayerNorm:", name, module)
 
-    def fit(self, trial_number: int = -1) -> float:
+    def fit(self) -> float:
         """
         Fits a model to the given dataset.
         If it is a test run the trial number is set to 0, otherwise it is set to the trial number.
@@ -148,12 +148,6 @@ class TextAutoML:
         gc.collect()  # Force garbage collection
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-
-        # if this is a trial model, finish the wandb run, because outside we only do the test run,
-        # and if this is not the chosen last model we dont do that
-        if trial_number != -1 and self.wandb_logger:
-            #turn off wandb
-            self.wandb_logger.finish()
 
         return 1 - val_acc
 
@@ -258,9 +252,6 @@ class TextAutoML:
                 print(f"---Early stopping at epoch {epoch + 1} due to no improvement in validation accuracy.")
                 break
 
-        # if save_path is not None:
-        #     self.model.save_model(save_path, f"epoch_{epoch + 1}_acc_{val_acc:.4f}")
-
         # Clean up training objects, at the end of training
         del criterion
         if 'class_weights' in locals():
@@ -269,7 +260,6 @@ class TextAutoML:
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-        
         return val_acc
 
     def _predict(self, val_loader: DataLoader):

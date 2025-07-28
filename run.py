@@ -8,6 +8,8 @@ print("Starting the AutoML run...")  # Debugging line to check if the script sta
 import optuna
 print("Optuna imported successfully")  # Debugging line to check if Optuna imports correctly
 from functools import partial
+import optuna.visualization as vis
+# import matplotlib.pyplot as plt
 
 from optuna.visualization import plot_contour
 from optuna.visualization import plot_edf
@@ -85,85 +87,90 @@ def main_loop(
     
     print(f"Train size: {len(train_df)}, Validation size: {len(val_df)}, Test size: {len(test_df)}")
 
-    # TODO implement BOHB for the model hyperparameters, can remove the parts below and add it in the optimizer
+    # # TODO implement NAS
+    # from automl.automl_methods.nas.optuna_nas import objective
+    # n_trials = 15  # Number of trials to run
+    # print(f"Running NAS with {n_trials} trials")
 
-    # TODO implement NAS
-    from automl.automl_methods.nas.optuna_nas import objective
-    n_trials = 15  # Number of trials to run
-    print(f"Running NAS with {n_trials} trials")
+    # for i in range (0,10):
+    #     nas_study_name = f"nas_{i+1}"
+    #     # check if folder exists
+    #     nas_study_path = output_path / nas_study_name
+    #     if not nas_study_path.exists():
+    #         nas_study_path.mkdir(parents=True, exist_ok=True)
+    #         break
+    #     if i == 9:
+    #         raise ValueError(f"You already have 10 in {output_path}, please remove some.")
 
-    for i in range (0,10):
-        nas_study_name = f"nas_{i+1}"
-        # check if folder exists
-        nas_study_path = output_path / nas_study_name
-        if not nas_study_path.exists():
-            nas_study_path.mkdir(parents=True, exist_ok=True)
-            break
-        if i == 9:
-            raise ValueError(f"You already have 10 in {output_path}, please remove some.")
+    # # a wand just for the NAS run, might no need it
+    # wandb_nas_run = wandb.init(
+    #     project="text-automl",
+    #     name=f"nas_{dataset}_seed{seed}_{nas_study_name}",
+    #     config={
+    #         "sampler": "TPESampler",
+    #         "n_trials": n_trials,
+    #         "dataset": dataset,
+    #         "seed": seed,
+    #         "val_percentage": val_percentage,
+    #         "token_length": token_length,
+    #         "epochs": epochs,
+    #         "batch_size": batch_size,
+    #         "lr": lr,
+    #         "weight_decay": weight_decay,
+    #         "data_fraction": data_fraction,
+    #         "train_size": len(train_df),
+    #         "val_size": len(val_df) if val_df is not None else 0,
+    #         "test_size": len(test_df),
+    #         "num_classes": num_classes
+    #     },
+    #     tags=[dataset, "distilbert", "text-classification", "nas"]  # Add tags for easy filtering
+    # )
 
-    # a wand just for the NAS run, might no need it
-    wandb_nas_run = wandb.init(
-        project="text-automl",
-        name=f"nas_{dataset}_seed{seed}_{nas_study_name}",
-        config={
-            "sampler": "TPESampler",
-            "n_trials": n_trials,
-            "dataset": dataset,
-            "seed": seed,
-            "val_percentage": val_percentage,
-            "token_length": token_length,
-            "epochs": epochs,
-            "batch_size": batch_size,
-            "lr": lr,
-            "weight_decay": weight_decay,
-            "data_fraction": data_fraction,
-            "train_size": len(train_df),
-            "val_size": len(val_df) if val_df is not None else 0,
-            "test_size": len(test_df),
-            "num_classes": num_classes
-        },
-        tags=[dataset, "distilbert", "text-classification", "nas"]  # Add tags for easy filtering
-    )
+    # # Create a TPESampler with custom parameters
+    # sampler = optuna.samplers.TPESampler(
+    #     n_startup_trials=8,   # Number of random trials before using TPE
+    #     seed=42,
+    #     multivariate=True,  # Enable multivariate sampling
+    # )
 
-    # Create a TPESampler with custom parameters
-    sampler = optuna.samplers.TPESampler(
-        n_startup_trials=8,   # Number of random trials before using TPE
-        seed=42,
-        multivariate=True,  # Enable multivariate sampling
-    )
-
-    objective_fn = partial(
-        objective,
-        epochs=epochs,
-        lr=lr,
-        batch_size=batch_size,
-        seed=seed,
-        token_length=token_length,
-        weight_decay=weight_decay,
-        train_df=train_df,
-        val_df=val_df,
-        num_classes=num_classes,
-        output_path=nas_study_path,
-        normalized_class_weights=normalized_class_weights,
-        wandb_run=wandb_nas_run
-    )
+    # objective_fn = partial(
+    #     objective,
+    #     epochs=epochs,
+    #     lr=lr,
+    #     batch_size=batch_size,
+    #     seed=seed,
+    #     token_length=token_length,
+    #     weight_decay=weight_decay,
+    #     train_df=train_df,
+    #     val_df=val_df,
+    #     num_classes=num_classes,
+    #     output_path=nas_study_path,
+    #     normalized_class_weights=normalized_class_weights,
+    #     wandb_run=wandb_nas_run
+    # )
         
-    study = optuna.create_study(
-        direction="minimize",
-        sampler=sampler,
-        study_name=nas_study_name,
-        storage=f"sqlite:///{nas_study_path / 'study.db'}",
-        )
-    # study.optimize(objective_fn, n_trials=5, callbacks=[visualize_kernels])
-    study.optimize(objective_fn, n_trials=n_trials)
+    # study = optuna.create_study(
+    #     direction="minimize",
+    #     sampler=sampler,
+    #     study_name=nas_study_name,
+    #     storage=f"sqlite:///{nas_study_path / 'study.db'}",
+    #     )
+    # # study.optimize(objective_fn, n_trials=5, callbacks=[visualize_kernels])
+    # study.optimize(objective_fn, n_trials=n_trials)
+
+    # load study from the database
+    nas_study_path = output_path / "nas_2"
+    print("Loading study from:", nas_study_path)
+    nas_study_load_path = nas_study_path / "study.db"
+    study = optuna.load_study(
+        study_name="nas_2",
+        storage=f"sqlite:///{nas_study_load_path}",
+    )
 
     val_err = 1 - study.best_value
     print("Best score:", 1 - study.best_value)
     print("Best params:", study.best_params)
 
-    # TODO load and do it, but you have to fix the saved model places.
-  
     # get the path of the best model
     trial_id = study.best_trial.number
     print(f"Best trial ID: {trial_id}")
@@ -220,17 +227,17 @@ def main_loop(
         train_df=train_df,
         val_df=val_df,
         save_path=output_path,
-        wandb_logger=None,
+        wandb_logger=None, # 
     )
-    # if you want to create a new model to train
-    automl.create_model(
-        fraction_layers_to_finetune=0.0,
-        num_classes=num_classes,
-        classification_head_hidden_dim=64,
-        classification_head_dropout_rate=0.2,
-        classification_head_hidden_layers=4,  # [1,4]
-        classification_head_activation='LeakyReLU',  # Default activation, can be changed later
-    )
+    # # if you want to create a new model to train
+    # automl.create_model(
+    #     fraction_layers_to_finetune=0.0,
+    #     num_classes=num_classes,
+    #     classification_head_hidden_dim=64,
+    #     classification_head_dropout_rate=0.2,
+    #     classification_head_hidden_layers=4,  # [1,4]
+    #     classification_head_activation='LeakyReLU',  # Default activation, can be changed later
+    # )
 
     # if you want to load a pre-trained model
     automl.load_model(model_path=model_path)
@@ -276,9 +283,6 @@ def main_loop(
     if not np.isnan(test_labels).any():
         acc = accuracy_score(test_labels, test_preds)
         print(f"Accuracy on test set: {acc}")
-
-        # Log test accuracy to wandb, only for training one model
-        # wandb_run.log({"test_accuracy": acc, "test_error": float(1-acc)})
         
         with (output_path / "score.yaml").open("a+") as f:
             yaml.safe_dump({"test_err": float(1-acc)}, f)
@@ -293,24 +297,90 @@ def main_loop(
 
     # Log total execution time to wandb
     # TODO add it to the results file, also make the results file better.
-    # wandb_run.log({"total_execution_time": elapsed_time})
+    with (output_path / "score.yaml").open("a+") as f:
+        yaml.safe_dump({"total_execution_time": elapsed_time}, f)
 
-    wandb_nas_run.finish()
-
-    plot_optimization_history(study).write_image(nas_study_path / "optimization_history.png")
-    plot_contour(study).write_image(nas_study_path / "contour.png")
-    plot_edf(study).write_image(nas_study_path / "edf.png")
-    plot_intermediate_values(study).write_image(nas_study_path / "intermediate.png")    
-    plot_optimization_history(study).write_image(nas_study_path / "optimization_history.png")
-    plot_parallel_coordinate(study).write_image(nas_study_path / "parallel_coordinate.png")
-    plot_param_importances(study).write_image(nas_study_path / "param_importances.png")
-    plot_rank(study).write_image(nas_study_path / "rank.png")
-    plot_slice(study).write_image(nas_study_path / "slice.png")
-    plot_param_importances(
-    study, target=lambda t: t.duration.total_seconds(), target_name="duration"
-    ).write_image(nas_study_path / "param_importances_duration.png")
-    plot_timeline(study).write_image(nas_study_path / "timeline.png")
+    # Save plots instead of showing them (since we're in a non-interactive environment)
+    plots_dir = nas_study_path / "plots"
+    plots_dir.mkdir(exist_ok=True)
     
+    print("Saving optimization plots...")
+    
+    try:
+        fig = vis.plot_optimization_history(study)
+        fig.write_html(plots_dir / "optimization_history.html")
+        print("Saved optimization history plot")
+    except Exception as e:
+        print(f"Error saving optimization history: {e}")
+    
+    try:
+        fig = vis.plot_contour(study)
+        fig.write_html(plots_dir / "contour.html") 
+        print("Saved contour plot")
+    except Exception as e:
+        print(f"Error saving contour plot: {e}")
+    
+    try:
+        fig = vis.plot_edf(study)
+        fig.write_html(plots_dir / "edf.html")
+        print("Saved EDF plot")
+    except Exception as e:
+        print(f"Error saving EDF plot: {e}")
+    
+    try:
+        fig = vis.plot_intermediate_values(study)
+        fig.write_html(plots_dir / "intermediate_values.html")
+        print("Saved intermediate values plot")
+    except Exception as e:
+        print(f"Error saving intermediate values plot: {e}")
+    
+    try:
+        fig = vis.plot_parallel_coordinate(study)
+        fig.write_html(plots_dir / "parallel_coordinate.html")
+        print("Saved parallel coordinate plot")
+    except Exception as e:
+        print(f"Error saving parallel coordinate plot: {e}")
+    
+    try:
+        fig = vis.plot_param_importances(study)
+        fig.write_html(plots_dir / "param_importances.html")
+        print("Saved parameter importances plot")
+    except Exception as e:
+        print(f"Error saving parameter importances plot: {e}")
+    
+    try:
+        fig = vis.plot_rank(study)
+        fig.write_html(plots_dir / "rank.html")
+        print("Saved rank plot")
+    except Exception as e:
+        print(f"Error saving rank plot: {e}")
+    
+    try:
+        fig = vis.plot_slice(study)
+        fig.write_html(plots_dir / "slice.html")
+        print("Saved slice plot")
+    except Exception as e:
+        print(f"Error saving slice plot: {e}")
+    
+    try:
+        fig = vis.plot_param_importances(
+            study, target=lambda t: t.duration.total_seconds(), target_name="duration"
+        )
+        fig.write_html(plots_dir / "param_importances_duration.html")
+        print("Saved parameter importances (duration) plot")
+    except Exception as e:
+        print(f"Error saving parameter importances duration plot: {e}")
+    
+    try:
+        fig = vis.plot_timeline(study)
+        fig.write_html(plots_dir / "timeline.html")
+        print("Saved timeline plot")
+    except Exception as e:
+        print(f"Error saving timeline plot: {e}")
+    
+    print(f"All plots saved to {plots_dir}")
+    print("Note: Open the .html files in a web browser to view the interactive plots")
+
     return val_err
 
 
