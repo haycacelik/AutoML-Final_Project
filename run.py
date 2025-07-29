@@ -150,10 +150,10 @@ def main_loop(
     #     study_name="nas_2",
     #     storage=f"sqlite:///{nas_study_load_path}",
     # )
-
-    # val_err = 1 - study.best_value
-    # print("Best score:", 1 - study.best_value)
-    # print("Best params:", study.best_params)
+    
+    val_err = 1 - study.best_value
+    print("Best score:", 1 - study.best_value)
+    print("Best params:", study.best_params)
 
     # get the path of the best model
     trial_id = study.best_trial.number
@@ -390,7 +390,7 @@ if __name__ == "__main__":
         seed=seed,
         token_length=128,
         epochs= 15,
-        batch_size=16,  # Reduced from 32 to avoid CUDA memory errors
+        batch_size=16,
         lr=5e-5,
         weight_decay=0.01,
         data_fraction=1.0, # "Subsampling of training set, in fraction (0, 1]. 1 is all the data"
