@@ -109,7 +109,6 @@ def BOHB(dataset):
     config_space = CS.ConfigurationSpace()
     config_space.add([
         CS.Constant("classification_head_hidden_dim", 128),
-        CS.Constant("classification_head_dropout_rate", 0.1),
         CS.Constant("classification_head_hidden_layers", 2),
     ]
     )
@@ -125,7 +124,8 @@ def BOHB(dataset):
         CS.CategoricalHyperparameter("batch_size", [16, 32, 64]),
         CS.UniformFloatHyperparameter("weight_decay", 1e-6, 0.1, log=True),
         CS.UniformFloatHyperparameter("lr", 1e-4, 1e-1, log=True),
-        CS.UniformFloatHyperparameter("fraction_layers_to_finetune", 0.0, 1.0)
+        CS.UniformFloatHyperparameter("fraction_layers_to_finetune", 0.0, 1.0),
+        CS.UniformFloatHyperparameter("classification_head_dropout_rate", 0.1, 0.5)
     ])
 
     # 2. Define scheduler and search algorithm
