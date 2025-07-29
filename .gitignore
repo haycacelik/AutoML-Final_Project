@@ -8,8 +8,9 @@ dataset_prep/
 
 output/
 results/
-.data/
+data/
 data/
 *logs/
 .base
 wandb
+conda_command
