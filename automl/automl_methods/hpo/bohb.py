@@ -108,6 +108,12 @@ def BOHB(dataset):
     # Define ConfigSpace search space
     config_space = CS.ConfigurationSpace()
     config_space.add([
+        CS.Constant("classification_head_hidden_dim", 128),
+        CS.Constant("classification_head_dropout_rate", 0.1),
+        CS.Constant("classification_head_hidden_layers", 2),
+    ]
+    )
+    config_space.add([
         CS.Constant("epochs", 10),
         CS.Constant("dataset", dataset),
         CS.Constant("seed", 42),
@@ -115,11 +121,8 @@ def BOHB(dataset):
         CS.Constant("output_path", "results"),
         CS.Constant("data_path", "data"),
         CS.Constant("data_fraction", 1.0),
-        CS.CategoricalHyperparameter("batch_size", [16, 32, 64]),
         CS.CategoricalHyperparameter("token_length", [64, 128, 256, 512]),
-        CS.CategoricalHyperparameter("classification_head_hidden_dim", [32, 64, 128, 256]),
-        CS.UniformFloatHyperparameter("classification_head_dropout_rate", 0.0, 0.5),
-        CS.UniformIntegerHyperparameter("classification_head_hidden_layers", 1, 6),
+        CS.CategoricalHyperparameter("batch_size", [16, 32, 64]),
         CS.UniformFloatHyperparameter("weight_decay", 1e-6, 0.1, log=True),
         CS.UniformFloatHyperparameter("lr", 1e-4, 1e-1, log=True),
         CS.UniformFloatHyperparameter("fraction_layers_to_finetune", 0.0, 1.0)
@@ -128,7 +131,8 @@ def BOHB(dataset):
     # 2. Define scheduler and search algorithm
     bohb_search = TuneBOHB(space=config_space, metric="val_acc", mode="max")
     bohb_search = tune.search.ConcurrencyLimiter(bohb_search, max_concurrent=1)
-    bohb_scheduler = HyperBandForBOHB(time_attr="training_iteration", metric="val_acc", max_t=10, mode="max")
+    bohb_scheduler = HyperBandForBOHB(time_attr="training_iteration", metric="val_acc", max_t=10,
+                                      mode="max", grace_period=3)
 
     train_df, val_df, num_classes = load_data("imdb",
                                               data_path=Path(PROJECT_ROOT / "data"),
@@ -144,7 +148,7 @@ def BOHB(dataset):
         search_alg=bohb_search,
         scheduler=bohb_scheduler,
         num_samples=20,
-        resources_per_trial={"cpu": 2, "gpu": 1},
+        resources_per_trial={"cpu": 0, "gpu": 1},
         storage_path=str(PROJECT_ROOT / "experiments/bohb_results"),
         trial_dirname_creator=short_trial_name,
         trial_name_creator=short_trial_name,
