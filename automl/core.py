@@ -7,12 +7,12 @@ from sklearn.metrics import accuracy_score
 from automl.utils import SimpleTextDataset
 from pathlib import Path
 from typing import Tuple
+import wandb
 from wandb.sdk.wandb_run import Run
 from transformers import AutoTokenizer
 from automl.model.custom_model import  DistilBertWithCustomHead
 import gc
-
-
+from ray import tune
 
 model_name = 'distilbert-base-uncased'
 
@@ -38,7 +38,6 @@ class TextAutoML:
         self.epochs = epochs
         self.batch_size = batch_size
         self.lr = lr
-        print("---learning rate", self.lr)
         self.weight_decay = weight_decay
         self.normalized_class_weights = normalized_class_weights
         self.train_texts = train_df['text'].tolist()
@@ -53,8 +52,8 @@ class TextAutoML:
             self.wandb_logger.config.update({"vocab_size": self.tokenizer.vocab_size})
 
         print("---learning rate", self.lr)
-        
-    def create_model(self, 
+
+    def create_model(self,
                      fraction_layers_to_finetune: float,
                     classification_head_hidden_dim: int,
                     classification_head_dropout_rate: float,
@@ -89,7 +88,7 @@ class TextAutoML:
 
     def load_model(self, model_path: Path):
         """Loads a saved model from the specified path."""
-        # send the model to the device inside 
+        # send the model to the device inside
         self.model = DistilBertWithCustomHead.load_model(model_path, device=self.device)
         # update the hidden size in wandb config
         hidden_size = self.model.hidden_size
@@ -140,6 +139,7 @@ class TextAutoML:
         val_acc = self._train_loop(
             train_loader,
             val_loader,
+            load_path=self.load_path,
             save_path=self.save_path,
         )
 
@@ -158,18 +158,17 @@ class TextAutoML:
         save_path: Path,
     ):
         print("---Starting training loop...")
-        
+
         # Clear CUDA cache before starting training
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-        
+
         # TODO still have not checked if it makes a big difference, should check it with amazon
         if self.normalized_class_weights is not None:
             class_weights = torch.tensor(self.normalized_class_weights, dtype=torch.float).to(self.device)
             criterion = nn.CrossEntropyLoss(weight=class_weights)
             print(f"---Using class weights: {class_weights}")
         else:
-            print("---No class weights used.")
             criterion = nn.CrossEntropyLoss()
 
         start_epoch = 0
@@ -198,10 +197,10 @@ class TextAutoML:
                     preds = torch.argmax(logits, dim=1)
                     train_preds.extend(preds.cpu().numpy())
                     train_labels_list.extend(labels.cpu().numpy())
-                
+
                 # Clear variables to free GPU memory
                 del inputs, loss, logits, labels, preds
-                
+
                 # Clear CUDA cache every 10 batches to balance memory management and performance
                 if batch_idx % 10 == 0 and torch.cuda.is_available():
                     torch.cuda.empty_cache()
@@ -220,6 +219,8 @@ class TextAutoML:
             val_acc = accuracy_score(val_labels, val_preds)
             validation_results.append(val_acc)
             print(f"---Epoch {epoch + 1}, Validation Accuracy: {val_acc:.4f}")
+
+            tune.report(metrics={"val_acc": val_acc})
 
             # Clear validation data from memory
             del val_preds, val_labels
@@ -241,7 +242,7 @@ class TextAutoML:
                 max_validation_accuracy = val_acc
                 print(f"---New best validation accuracy: {max_validation_accuracy:.4f} at epoch {epoch + 1}")
                 validation_results = []  # Reset validation results
-                
+
                 # Save the model state
                 if save_path is not None:
                     file_name = f"epoch_{epoch + 1}_acc_{val_acc:.4f}"
@@ -259,7 +260,7 @@ class TextAutoML:
         gc.collect()  # Force garbage collection
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-
+        # return the last epoch's val_acc
         return val_acc
 
     def _predict(self, val_loader: DataLoader):
@@ -272,10 +273,10 @@ class TextAutoML:
                 logits = self.model.predict(inputs)
                 labels.extend(batch["labels"])
                 preds.extend(torch.argmax(logits, dim=1).cpu().numpy())
-                
+
                 # Clear batch data from GPU memory
                 del inputs, logits
-                
+
                 # Clear CUDA cache every 5 batches during validation
                 if batch_idx % 5 == 0 and torch.cuda.is_available():
                     torch.cuda.empty_cache()

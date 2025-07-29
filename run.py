@@ -3,6 +3,7 @@ from pathlib import Path
 from sklearn.metrics import accuracy_score, classification_report
 import yaml
 import wandb
+from wandb.sdk.wandb_run import Run
 import time
 print("Starting the AutoML run...")  # Debugging line to check if the script starts correctly
 import optuna
@@ -17,6 +18,7 @@ from automl.datasets import (
     IMDBDataset,
     get_fraction_of_data,
 )
+from config.config_loader import load_config, validate_config
 
 FINAL_TEST_DATASET=...  # TBA later
 
@@ -36,7 +38,7 @@ def main_loop(
 
     # get start time
     start_time = time.time()
-    
+
     match dataset:
         case "ag_news":
             dataset_class = AGNewsDataset
@@ -132,7 +134,7 @@ def main_loop(
         normalized_class_weights=normalized_class_weights,
         wandb_run=wandb_nas_run
     )
-        
+
     study = optuna.create_study(
         direction="minimize",
         sampler=sampler,
@@ -150,7 +152,7 @@ def main_loop(
     #     study_name="nas_2",
     #     storage=f"sqlite:///{nas_study_load_path}",
     # )
-    
+
     val_err = 1 - study.best_value
     print("Best score:", 1 - study.best_value)
     print("Best params:", study.best_params)
@@ -211,7 +213,7 @@ def main_loop(
         train_df=train_df,
         val_df=val_df,
         save_path=output_path,
-        wandb_logger=None, # 
+        wandb_logger=None, #
     )
     # # if you want to create a new model to train
     # automl.create_model(
@@ -267,7 +269,7 @@ def main_loop(
     if not np.isnan(test_labels).any():
         acc = accuracy_score(test_labels, test_preds)
         print(f"Accuracy on test set: {acc}")
-        
+
         with (output_path / "score.yaml").open("a+") as f:
             yaml.safe_dump({"test_err": float(1-acc)}, f)
         
@@ -287,65 +289,65 @@ def main_loop(
     # Save plots instead of showing them (since we're in a non-interactive environment)
     plots_dir = nas_study_path / "plots"
     plots_dir.mkdir(exist_ok=True)
-    
+
     print("Saving optimization plots...")
-    
+
     try:
         fig = vis.plot_optimization_history(study)
         fig.write_html(plots_dir / "optimization_history.html")
         print("Saved optimization history plot")
     except Exception as e:
         print(f"Error saving optimization history: {e}")
-    
+
     try:
         fig = vis.plot_contour(study)
-        fig.write_html(plots_dir / "contour.html") 
+        fig.write_html(plots_dir / "contour.html")
         print("Saved contour plot")
     except Exception as e:
         print(f"Error saving contour plot: {e}")
-    
+
     try:
         fig = vis.plot_edf(study)
         fig.write_html(plots_dir / "edf.html")
         print("Saved EDF plot")
     except Exception as e:
         print(f"Error saving EDF plot: {e}")
-    
+
     try:
         fig = vis.plot_intermediate_values(study)
         fig.write_html(plots_dir / "intermediate_values.html")
         print("Saved intermediate values plot")
     except Exception as e:
         print(f"Error saving intermediate values plot: {e}")
-    
+
     try:
         fig = vis.plot_parallel_coordinate(study)
         fig.write_html(plots_dir / "parallel_coordinate.html")
         print("Saved parallel coordinate plot")
     except Exception as e:
         print(f"Error saving parallel coordinate plot: {e}")
-    
+
     try:
         fig = vis.plot_param_importances(study)
         fig.write_html(plots_dir / "param_importances.html")
         print("Saved parameter importances plot")
     except Exception as e:
         print(f"Error saving parameter importances plot: {e}")
-    
+
     try:
         fig = vis.plot_rank(study)
         fig.write_html(plots_dir / "rank.html")
         print("Saved rank plot")
     except Exception as e:
         print(f"Error saving rank plot: {e}")
-    
+
     try:
         fig = vis.plot_slice(study)
         fig.write_html(plots_dir / "slice.html")
         print("Saved slice plot")
     except Exception as e:
         print(f"Error saving slice plot: {e}")
-    
+
     try:
         fig = vis.plot_param_importances(
             study, target=lambda t: t.duration.total_seconds(), target_name="duration"
@@ -354,14 +356,14 @@ def main_loop(
         print("Saved parameter importances (duration) plot")
     except Exception as e:
         print(f"Error saving parameter importances duration plot: {e}")
-    
+
     try:
         fig = vis.plot_timeline(study)
         fig.write_html(plots_dir / "timeline.html")
         print("Saved timeline plot")
     except Exception as e:
         print(f"Error saving timeline plot: {e}")
-    
+
     print(f"All plots saved to {plots_dir}")
     print("Note: Open the .html files in a web browser to view the interactive plots")
 
