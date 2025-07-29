@@ -9,18 +9,6 @@ import optuna
 print("Optuna imported successfully")  # Debugging line to check if Optuna imports correctly
 from functools import partial
 import optuna.visualization as vis
-# import matplotlib.pyplot as plt
-
-from optuna.visualization import plot_contour
-from optuna.visualization import plot_edf
-from optuna.visualization import plot_intermediate_values
-from optuna.visualization import plot_optimization_history
-from optuna.visualization import plot_parallel_coordinate
-from optuna.visualization import plot_param_importances
-from optuna.visualization import plot_rank
-from optuna.visualization import plot_slice
-from optuna.visualization import plot_timeline
-
 from automl.core import TextAutoML
 from automl.datasets import (
     AGNewsDataset,
@@ -31,10 +19,6 @@ from automl.datasets import (
 )
 
 FINAL_TEST_DATASET=...  # TBA later
-
-# import os
-# os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
-
 
 def main_loop(
         dataset: str,
@@ -87,89 +71,89 @@ def main_loop(
     
     print(f"Train size: {len(train_df)}, Validation size: {len(val_df)}, Test size: {len(test_df)}")
 
-    # # TODO implement NAS
-    # from automl.automl_methods.nas.optuna_nas import objective
-    # n_trials = 15  # Number of trials to run
-    # print(f"Running NAS with {n_trials} trials")
+    # implement NAS
+    from automl.automl_methods.nas.optuna_nas import objective
+    n_trials = 15  # Number of trials to run
+    print(f"Running NAS with {n_trials} trials")
 
-    # for i in range (0,10):
-    #     nas_study_name = f"nas_{i+1}"
-    #     # check if folder exists
-    #     nas_study_path = output_path / nas_study_name
-    #     if not nas_study_path.exists():
-    #         nas_study_path.mkdir(parents=True, exist_ok=True)
-    #         break
-    #     if i == 9:
-    #         raise ValueError(f"You already have 10 in {output_path}, please remove some.")
+    for i in range (0,10):
+        nas_study_name = f"nas_{i+1}"
+        # check if folder exists
+        nas_study_path = output_path / nas_study_name
+        if not nas_study_path.exists():
+            nas_study_path.mkdir(parents=True, exist_ok=True)
+            break
+        if i == 9:
+            raise ValueError(f"You already have 10 in {output_path}, please remove some.")
 
-    # # a wand just for the NAS run, might no need it
-    # wandb_nas_run = wandb.init(
-    #     project="text-automl",
-    #     name=f"nas_{dataset}_seed{seed}_{nas_study_name}",
-    #     config={
-    #         "sampler": "TPESampler",
-    #         "n_trials": n_trials,
-    #         "dataset": dataset,
-    #         "seed": seed,
-    #         "val_percentage": val_percentage,
-    #         "token_length": token_length,
-    #         "epochs": epochs,
-    #         "batch_size": batch_size,
-    #         "lr": lr,
-    #         "weight_decay": weight_decay,
-    #         "data_fraction": data_fraction,
-    #         "train_size": len(train_df),
-    #         "val_size": len(val_df) if val_df is not None else 0,
-    #         "test_size": len(test_df),
-    #         "num_classes": num_classes
-    #     },
-    #     tags=[dataset, "distilbert", "text-classification", "nas"]  # Add tags for easy filtering
-    # )
-
-    # # Create a TPESampler with custom parameters
-    # sampler = optuna.samplers.TPESampler(
-    #     n_startup_trials=8,   # Number of random trials before using TPE
-    #     seed=42,
-    #     multivariate=True,  # Enable multivariate sampling
-    # )
-
-    # objective_fn = partial(
-    #     objective,
-    #     epochs=epochs,
-    #     lr=lr,
-    #     batch_size=batch_size,
-    #     seed=seed,
-    #     token_length=token_length,
-    #     weight_decay=weight_decay,
-    #     train_df=train_df,
-    #     val_df=val_df,
-    #     num_classes=num_classes,
-    #     output_path=nas_study_path,
-    #     normalized_class_weights=normalized_class_weights,
-    #     wandb_run=wandb_nas_run
-    # )
-        
-    # study = optuna.create_study(
-    #     direction="minimize",
-    #     sampler=sampler,
-    #     study_name=nas_study_name,
-    #     storage=f"sqlite:///{nas_study_path / 'study.db'}",
-    #     )
-    # # study.optimize(objective_fn, n_trials=5, callbacks=[visualize_kernels])
-    # study.optimize(objective_fn, n_trials=n_trials)
-
-    # load study from the database
-    nas_study_path = output_path / "nas_2"
-    print("Loading study from:", nas_study_path)
-    nas_study_load_path = nas_study_path / "study.db"
-    study = optuna.load_study(
-        study_name="nas_2",
-        storage=f"sqlite:///{nas_study_load_path}",
+    # a wand just for the NAS run, might no need it
+    wandb_nas_run = wandb.init(
+        project="text-automl",
+        name=f"nas_{dataset}_seed{seed}_{nas_study_name}",
+        config={
+            "sampler": "TPESampler",
+            "n_trials": n_trials,
+            "dataset": dataset,
+            "seed": seed,
+            "val_percentage": val_percentage,
+            "token_length": token_length,
+            "epochs": epochs,
+            "batch_size": batch_size,
+            "lr": lr,
+            "weight_decay": weight_decay,
+            "data_fraction": data_fraction,
+            "train_size": len(train_df),
+            "val_size": len(val_df) if val_df is not None else 0,
+            "test_size": len(test_df),
+            "num_classes": num_classes
+        },
+        tags=[dataset, "distilbert", "text-classification", "nas"]  # Add tags for easy filtering
     )
 
-    val_err = 1 - study.best_value
-    print("Best score:", 1 - study.best_value)
-    print("Best params:", study.best_params)
+    # Create a TPESampler with custom parameters
+    sampler = optuna.samplers.TPESampler(
+        n_startup_trials=8,   # Number of random trials before using TPE
+        seed=42,
+        multivariate=True,  # Enable multivariate sampling
+    )
+
+    objective_fn = partial(
+        objective,
+        epochs=epochs,
+        lr=lr,
+        batch_size=batch_size,
+        seed=seed,
+        token_length=token_length,
+        weight_decay=weight_decay,
+        train_df=train_df,
+        val_df=val_df,
+        num_classes=num_classes,
+        output_path=nas_study_path,
+        normalized_class_weights=normalized_class_weights,
+        wandb_run=wandb_nas_run
+    )
+        
+    study = optuna.create_study(
+        direction="minimize",
+        sampler=sampler,
+        study_name=nas_study_name,
+        storage=f"sqlite:///{nas_study_path / 'study.db'}",
+        )
+    # study.optimize(objective_fn, n_trials=5, callbacks=[visualize_kernels])
+    study.optimize(objective_fn, n_trials=n_trials)
+
+    # load study from the database
+    # nas_study_path = output_path / "nas_2"
+    # print("Loading study from:", nas_study_path)
+    # nas_study_load_path = nas_study_path / "study.db"
+    # study = optuna.load_study(
+    #     study_name="nas_2",
+    #     storage=f"sqlite:///{nas_study_load_path}",
+    # )
+
+    # val_err = 1 - study.best_value
+    # print("Best score:", 1 - study.best_value)
+    # print("Best params:", study.best_params)
 
     # get the path of the best model
     trial_id = study.best_trial.number
