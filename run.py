@@ -10,7 +10,7 @@ import optuna
 print("Optuna imported successfully")  # Debugging line to check if Optuna imports correctly
 from functools import partial
 import optuna.visualization as vis
-from automl.core import TextAutoML
+from automl.optuna_core import TextAutoML
 from automl.datasets import (
     AGNewsDataset,
     AmazonReviewsDataset,
@@ -206,7 +206,7 @@ def main_loop(
         # normalized_class_weights=None,
         seed=seed,
         token_length=token_length,
-        epochs=epochs,
+        max_epochs=epochs,
         batch_size=batch_size,
         lr=lr,
         weight_decay=weight_decay,
@@ -215,16 +215,6 @@ def main_loop(
         save_path=output_path,
         wandb_logger=None, #
     )
-    # # if you want to create a new model to train
-    # automl.create_model(
-    #     fraction_layers_to_finetune=0.0,
-    #     num_classes=num_classes,
-    #     classification_head_hidden_dim=64,
-    #     classification_head_dropout_rate=0.2,
-    #     classification_head_hidden_layers=4,  # [1,4]
-    #     classification_head_activation='LeakyReLU',  # Default activation, can be changed later
-    # )
-
     # if you want to load a pre-trained model
     automl.load_model(model_path=model_path)
 

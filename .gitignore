@@ -14,3 +14,4 @@ data/
 .base
 wandb
 conda_command
+experiments/

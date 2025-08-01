@@ -1,0 +1,36 @@
+2025-08-01 17:59:12,743 - automl.bohb_core - INFO - Epoch 1, Loss: 218.1961, Train Accuracy: 0.5470
+2025-08-01 17:59:47,518 - automl.bohb_core - INFO - Epoch 1, Validation Accuracy: 0.7828
+2025-08-01 18:05:37,716 - automl.bohb_core - INFO - Epoch 1, Loss: 182.0785, Train Accuracy: 0.6835
+2025-08-01 18:06:12,344 - automl.bohb_core - INFO - Epoch 1, Validation Accuracy: 0.8858
+2025-08-01 18:07:56,536 - automl.bohb_core - INFO - Epoch 1, Loss: 219.4057, Train Accuracy: 0.4986
+2025-08-01 18:08:10,366 - automl.bohb_core - INFO - Epoch 1, Validation Accuracy: 0.5000
+2025-08-01 18:13:37,079 - automl.bohb_core - INFO - Epoch 1, Loss: 227.7671, Train Accuracy: 0.5049
+2025-08-01 18:14:11,851 - automl.bohb_core - INFO - Epoch 1, Validation Accuracy: 0.5394
+2025-08-01 18:20:41,998 - automl.bohb_core - INFO - Epoch 1, Loss: 138.9934, Train Accuracy: 0.7870
+2025-08-01 18:21:16,893 - automl.bohb_core - INFO - Epoch 1, Validation Accuracy: 0.9058
+2025-08-01 18:24:36,821 - automl.bohb_core - INFO - Epoch 1, Loss: 219.7040, Train Accuracy: 0.4970
+2025-08-01 18:24:57,791 - automl.bohb_core - INFO - Epoch 1, Validation Accuracy: 0.5000
+2025-08-01 18:31:28,523 - automl.bohb_core - INFO - Epoch 1, Loss: 115.1872, Train Accuracy: 0.8330
+2025-08-01 18:32:03,444 - automl.bohb_core - INFO - Epoch 1, Validation Accuracy: 0.9064
+2025-08-01 18:34:15,819 - automl.bohb_core - INFO - Epoch 1, Loss: 219.2251, Train Accuracy: 0.4988
+2025-08-01 18:34:31,247 - automl.bohb_core - INFO - Epoch 1, Validation Accuracy: 0.5000
+2025-08-01 18:41:02,826 - automl.bohb_core - INFO - Epoch 1, Loss: 187.7348, Train Accuracy: 0.6621
+2025-08-01 18:41:37,776 - automl.bohb_core - INFO - Epoch 1, Validation Accuracy: 0.8766
+2025-08-01 18:47:35,384 - automl.bohb_core - INFO - Epoch 2, Loss: 102.9500, Train Accuracy: 0.8847
+2025-08-01 18:48:10,027 - automl.bohb_core - INFO - Epoch 2, Validation Accuracy: 0.9006
+2025-08-01 18:53:41,336 - automl.bohb_core - INFO - Epoch 3, Loss: 91.8965, Train Accuracy: 0.9001
+2025-08-01 18:54:16,089 - automl.bohb_core - INFO - Epoch 3, Validation Accuracy: 0.9050
+2025-08-01 19:00:47,270 - automl.bohb_core - INFO - Epoch 2, Loss: 78.6444, Train Accuracy: 0.9152
+2025-08-01 19:01:22,004 - automl.bohb_core - INFO - Epoch 2, Validation Accuracy: 0.9020
+2025-08-01 19:07:33,082 - automl.bohb_core - INFO - Epoch 3, Loss: 71.5193, Train Accuracy: 0.9201
+2025-08-01 19:08:07,860 - automl.bohb_core - INFO - Epoch 3, Validation Accuracy: 0.9124
+2025-08-01 19:14:40,479 - automl.bohb_core - INFO - Epoch 2, Loss: 62.5838, Train Accuracy: 0.9329
+2025-08-01 19:15:15,257 - automl.bohb_core - INFO - Epoch 2, Validation Accuracy: 0.9122
+2025-08-01 19:21:28,253 - automl.bohb_core - INFO - Epoch 3, Loss: 56.0899, Train Accuracy: 0.9391
+2025-08-01 19:22:03,347 - automl.bohb_core - INFO - Epoch 3, Validation Accuracy: 0.9180
+2025-08-01 19:28:16,104 - automl.bohb_core - INFO - Epoch 4, Loss: 41.4435, Train Accuracy: 0.9595
+2025-08-01 19:28:50,990 - automl.bohb_core - INFO - Epoch 4, Validation Accuracy: 0.9094
+2025-08-01 19:35:03,675 - automl.bohb_core - INFO - Epoch 5, Loss: 32.1473, Train Accuracy: 0.9709
+2025-08-01 19:35:38,703 - automl.bohb_core - INFO - Epoch 5, Validation Accuracy: 0.9026
+2025-08-01 19:41:52,461 - automl.bohb_core - INFO - Epoch 6, Loss: 24.3417, Train Accuracy: 0.9804
+2025-08-01 19:42:29,095 - automl.bohb_core - INFO - Epoch 6, Validation Accuracy: 0.9174

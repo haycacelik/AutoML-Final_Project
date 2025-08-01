@@ -10,7 +10,7 @@ import argparse
 import pandas as pd
 import wandb
 from pathlib import Path
-from automl.core import TextAutoML
+from automl.optuna_core import TextAutoML
 from automl.datasets import AmazonReviewsDataset, AGNewsDataset, IMDBDataset, DBpediaDataset
 
 def main():
@@ -64,7 +64,7 @@ def main():
     automl = TextAutoML(
         normalized_class_weights=normalized_class_weights,
         seed=args.seed,
-        epochs=args.epochs,
+        max_epochs=args.epochs,
         use_custom_head=args.use_custom_head,
         head_dropout_rate=0.2,
         head_hidden_layers=2,

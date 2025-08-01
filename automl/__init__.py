@@ -1,4 +1,4 @@
-from .core import (
+from .optuna_core import (
     TextAutoML,
     SimpleTextDataset,
 )
