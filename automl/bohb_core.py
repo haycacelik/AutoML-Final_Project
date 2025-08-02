@@ -1,4 +1,3 @@
-import tempfile
 import numpy as np
 import pandas as pd
 import torch
@@ -56,6 +55,9 @@ class TextAutoML:
         self.val_texts = val_df['text'].tolist()
         self.val_labels = val_df['label'].tolist()
 
+        self.best_model_state = None  # To store the best model's state dict
+        self.best_optimizer_state = None  # To store the best optimizer's state dict
+
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
         print("---learning rate", self.lr)
@@ -96,29 +98,44 @@ class TextAutoML:
         self.no_improvement_count = 0  # Counter for early stopping
 
 
-    def load_model(self, temp_dir: Path):
+    def load_model(self, model_dir: Path):
         """Loads a saved model from the specified path."""
-        print("---Loading model from", temp_dir)
+        print("---Loading model from", model_dir)
         
-        state = torch.load(temp_dir / "extra_state.pth")
+        state = torch.load(model_dir / "extra_state.pth")
         self.starting_epoch = state["epoch"] + 1
         self.overfit = state["overfit"]
         self.max_validation_accuracy = state["max_validation_accuracy"]
 
         # if the model is not overfitting, load the model and optimizer
         if not self.overfit:
-            print("---Loading the model from", temp_dir)
+            print("---Loading the model from", model_dir)
             self.no_improvement_count = state["no_improvement_count"]
 
             # send the model to the device inside
-            self.model = DistilBertWithCustomHead.load_model(temp_dir / "model.pth", device=self.device)
+            self.model = DistilBertWithCustomHead.load_model(model_dir / "model.pth", device=self.device)
 
             # load the optimizer state
             self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
-            self.optimizer.load_state_dict(torch.load(temp_dir / "optimizer.pth"))
+            self.optimizer.load_state_dict(torch.load(model_dir / "optimizer.pth"))
 
             # check if the model is correctly loaded
             self._model_debug_prints()
+
+
+    def save_best_model(self):
+        """Saves the current model and optimizer state as the best model."""
+        self.best_model_state = self.model.state_dict()
+        self.best_optimizer_state = self.optimizer.state_dict()
+        print("---Saved best model state")
+
+
+    def load_best_model(self):
+        """Loads the best saved model state."""
+        if self.best_model_state is not None:
+            self.model.load_state_dict(self.best_model_state)
+            self.optimizer.load_state_dict(self.best_optimizer_state)
+            print("---Loaded best model state")
 
     def _model_debug_prints(self):
         """Prints debug information about the model."""
@@ -139,10 +156,11 @@ class TextAutoML:
         print(f"---Model has already overfitted, skipping training.")
 
         for epoch in range(self.starting_epoch, self.max_epochs):
-            with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
-                self.save_extra_info(current_epoch=epoch, save_dir=Path(temp_checkpoint_dir))
-                checkpoint = Checkpoint.from_directory(temp_checkpoint_dir)
-                tune.report(metrics={"val_acc": self.max_validation_accuracy}, checkpoint=checkpoint)
+            checkpoint_dir = Path(f"checkpoint_{epoch}")
+            checkpoint_dir.mkdir(exist_ok=True)
+            self.save_extra_info(current_epoch=epoch, save_dir=checkpoint_dir)
+            checkpoint = Checkpoint.from_directory(str(checkpoint_dir))
+            tune.report(metrics={"val_acc": self.max_validation_accuracy}, checkpoint=checkpoint)
         return
 
 
@@ -265,6 +283,9 @@ class TextAutoML:
                 self.max_validation_accuracy = val_acc
                 print(f"---New best validation accuracy: {self.max_validation_accuracy:.4f} at epoch {epoch}")
                 self.no_improvement_count = 0  # Reset no improvement count
+
+                # Save the best model state (in memory)
+                self.save_best_model()
             else:
                 self.no_improvement_count += 1
                 print(f"---No improvement in validation accuracy for {self.no_improvement_count} epochs.")
@@ -272,20 +293,24 @@ class TextAutoML:
                     print(f"---Early stopping at epoch {epoch + 1} due to no improvement in validation accuracy.")
                     self.overfit = True
 
+                    # Load the best model state before reporting
+                    self.load_best_model()
+
             print("at epoch %d saving the model temporarily" % epoch)
-            with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
-                checkpoint = None
-                self.model.save_model(save_dir=temp_checkpoint_dir)
-                self.save_optimizer(save_dir=temp_checkpoint_dir)
-                self.save_extra_info(current_epoch=epoch, save_dir=Path(temp_checkpoint_dir))
-                checkpoint = Checkpoint.from_directory(temp_checkpoint_dir)
+            checkpoint_dir = Path(f"checkpoint_{epoch}")
+            checkpoint_dir.mkdir(exist_ok=True)
 
-                # Force garbage collection to free memory
-                gc.collect() 
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
+            self.model.save_model(save_dir=checkpoint_dir)
+            self.save_optimizer(save_dir=checkpoint_dir)
+            self.save_extra_info(current_epoch=epoch, save_dir=checkpoint_dir)
+            checkpoint = Checkpoint.from_directory(str(checkpoint_dir))
 
-                tune.report(metrics={"val_acc": self.max_validation_accuracy}, checkpoint=checkpoint)
+            # Force garbage collection to free memory
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+            tune.report(metrics={"val_acc": self.max_validation_accuracy}, checkpoint=checkpoint)
 
             print("does it continue in the loop")
 

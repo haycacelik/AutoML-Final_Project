@@ -1,10 +1,13 @@
+import json
 import os
+import shutil
 from pathlib import Path
 import wandb
 from ray import tune
 from ray.tune.experiment import Trial
 from ray.tune.schedulers import HyperBandForBOHB
 from ray.tune.search.bohb import TuneBOHB
+from ray.tune import ExperimentAnalysis
 import ConfigSpace as CS
 from automl import AGNewsDataset, IMDBDataset, AmazonReviewsDataset, DBpediaDataset
 from automl.datasets import get_fraction_of_data
@@ -12,6 +15,79 @@ from automl.bohb_core import TextAutoML
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+
+
+def load_analysis_from_checkpoints(dataset):
+    experiment_dir = PROJECT_ROOT / "experiments/bohb_results/bohb_exp"
+    analysis = ExperimentAnalysis(experiment_checkpoint_path=experiment_dir, default_metric="val_acc",
+                                  default_mode="max")
+
+    # analysis.best_checkpoint  ->   Checkpoint(filesystem=local, path=C:/Users/deniz/PycharmProjects/AutoML-Final_Project/experiments/bohb_results/bohb_exp/imdb_lr1.0e-06_wd1.3e-05_ft4_dr0.44_2fcc6720/checkpoint_000008)
+    # analysis.best_trial       ->   imdb_lr1.0e-06_wd1.3e-05_ft4_dr0.44_2fcc6720
+    # analysis.best_config      ->   returns dict with the best ConfigSpace param values
+    # analysis.best_result      ->   returns a dict version of best_result_df
+    # analysis.best_result_df   ->   returns the row of the best trial from the results_df
+    # analysis.best_dataframe   ->   returns per epoch results of the best trial
+
+    # Create dataset-specific directories
+    output_root = PROJECT_ROOT / "best_models" / dataset
+    output_root.mkdir(parents=True, exist_ok=True)
+
+    # Get top-k trials
+    top_k = 3
+    top_trials = sorted(analysis.trials,
+                        key=lambda t: t.last_result.get("val_acc", 0),
+                        reverse=True)[:top_k]
+
+    # Save config and checkpoints of top-k trials
+    for i, trial in enumerate(top_trials, 1):
+        val_acc = trial.last_result["val_acc"]
+
+        trial_dir = output_root / f"rank_{i}_valacc_{val_acc:.4f}"
+        trial_dir.mkdir(exist_ok=True)
+
+        # 1. Save config
+        with open(trial_dir / "config.json", "w") as f:
+            json.dump(trial.config, f, indent=2, default=int)
+
+        # 2. Save checkpoint (if available)
+        if trial.checkpoint:
+            with trial.checkpoint.as_directory() as temp_dir:
+                # Copy entire checkpoint contents
+                shutil.copytree(temp_dir, trial_dir / "checkpoint")
+
+        print(f"Saved trial {i} to {trial_dir}")
+
+    # Clean up all trial directories when done
+    for trial in analysis.trials:
+        trial_dir = Path(experiment_dir / str(trial))
+        for subdir in trial_dir.iterdir():
+            if subdir.is_dir() and subdir.name.startswith("checkpoint_"):
+                shutil.rmtree(subdir, ignore_errors=True)
+
+    # train_df, val_df, num_classes, normalized_class_weights = load_data("imdb",
+    #                                                                     data_path=Path(PROJECT_ROOT / "data"),
+    #                                                                     val_percentage=0.2,
+    #                                                                     seed=42,
+    #                                                                     data_fraction=1.0,
+    #                                                                     )
+    #
+    # if trial.checkpoint:
+    #     with trial.checkpoint.as_directory() as ckpt_dir:
+    #         automl = TextAutoML(
+    #             normalized_class_weights=normalized_class_weights,
+    #             seed=config["seed"],
+    #             token_length=int(config["token_length"]),
+    #             max_epochs=config["epochs"],
+    #             batch_size=int(config["batch_size"]),
+    #             lr=config["lr"],
+    #             weight_decay=config["weight_decay"],
+    #             train_df=train_df,
+    #             val_df=val_df,
+    #         )
+    #         automl.load_model(Path(ckpt_dir))
+    #         print("Model loaded from checkpoint!")
+
 
 
 def short_trial_name(trial: Trial):
@@ -23,6 +99,7 @@ def short_trial_name(trial: Trial):
     dropout = config["dropout_rate"]
 
     return f"{dataset}_lr{lr:.1e}_wd{wd:.1e}_ft{finetune}_dr{dropout:.2f}_{trial.trial_id}"
+
 
 def load_data(dataset: str,
               data_path: Path,
@@ -127,7 +204,6 @@ def BOHB(dataset, hidden_dim, hidden_layers, activation, use_layer_norm):
         CS.Constant("data_fraction", 1.0),
         CS.Constant("batch_size", 64), # its better to use the biggest possible batch size for your GPU
         CS.CategoricalHyperparameter("token_length", [64, 128, 256, 512]),
-        # CS.CategoricalHyperparameter("batch_size", [16, 32, 64]),
         CS.UniformFloatHyperparameter("weight_decay", 1e-6, 0.1, log=True),
         CS.UniformFloatHyperparameter("lr", 1e-6, 1e-3, log=True),
         CS.UniformIntegerHyperparameter("amount_of_layers_to_finetune", 0, 6),
@@ -161,12 +237,12 @@ def BOHB(dataset, hidden_dim, hidden_layers, activation, use_layer_norm):
     )
 
     # 4. Run BOHB
-    tune.run(
+    analysis = tune.run(
         tune.with_parameters(train_model, data={"train_df": train_df, "val_df": val_df, "num_classes": num_classes, "normalized_class_weights": normalized_class_weights}),
         name="bohb_exp",
         search_alg=bohb_search,
         scheduler=bohb_scheduler,
-        num_samples=20, # this is the sum of all chosen hyperparameter configurations, if its 10 per succesive halving run then there will be 2 succesive halving runs
+        num_samples=40, # this is the sum of all chosen hyperparameter configurations, if its 10 per succesive halving run then there will be 2 succesive halving runs
         resources_per_trial={"cpu": 10, "gpu": 1},
         storage_path=str(PROJECT_ROOT / "experiments/bohb_results"),
         trial_dirname_creator=short_trial_name,
@@ -175,9 +251,6 @@ def BOHB(dataset, hidden_dim, hidden_layers, activation, use_layer_norm):
         log_to_file=True,  # Enable logging to files
     )
 
-    
-
-
 if __name__ == "__main__":
-    BOHB("imdb", hidden_dim=128, hidden_layers=2, activation="ReLU", use_layer_norm=True)
-
+    # BOHB("imdb", hidden_dim=128, hidden_layers=2, activation="ReLU", use_layer_norm=True)
+    load_analysis_from_checkpoints("imdb")
