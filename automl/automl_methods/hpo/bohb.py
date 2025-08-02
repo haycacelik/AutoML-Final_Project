@@ -175,6 +175,8 @@ def BOHB(dataset, hidden_dim, hidden_layers, activation, use_layer_norm):
         log_to_file=True,  # Enable logging to files
     )
 
+    
+
 
 if __name__ == "__main__":
     BOHB("imdb", hidden_dim=128, hidden_layers=2, activation="ReLU", use_layer_norm=True)

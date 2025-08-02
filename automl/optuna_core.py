@@ -7,12 +7,22 @@ from sklearn.metrics import accuracy_score
 from automl.utils import SimpleTextDataset
 from pathlib import Path
 from typing import Tuple
-import wandb
-from wandb.sdk.wandb_run import Run
 from transformers import AutoTokenizer
 from automl.model.custom_model import  DistilBertWithCustomHead
 import gc
-from ray import tune
+import os 
+import logging
+
+# Set up logging for Ray Tune
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),  # Console output
+        logging.FileHandler('training.log')  # File output
+    ]
+)
+logger = logging.getLogger(__name__) 
 
 model_name = 'distilbert-base-uncased'
 
@@ -28,7 +38,6 @@ class TextAutoML:
         weight_decay,
         train_df: pd.DataFrame,
         val_df: pd.DataFrame,
-        save_path: Path,
     ):
         np.random.seed(seed)
         torch.manual_seed(seed)
@@ -43,10 +52,10 @@ class TextAutoML:
         self.train_labels = train_df['label'].tolist()
         self.val_texts = val_df['text'].tolist()
         self.val_labels = val_df['label'].tolist()
-        self.save_path = save_path
+        self.train_accuracies = []
+        self.val_accuracies = []
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
- 
 
         print("---learning rate", self.lr)
 
@@ -77,7 +86,7 @@ class TextAutoML:
         # create the optimizer
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
-        # check if the model is created correctly
+        # check if the model is correctly created
         self._model_debug_prints()
 
         self.overfit = False
@@ -85,27 +94,27 @@ class TextAutoML:
         self.starting_epoch = 0 
         self.no_improvement_count = 0  # Counter for early stopping
 
-    def load_model(self, model_path: Path):
-        """Loads a saved model from the specified path.""",
 
-        print("---Loading model from", model_path)
+    def load_model(self, temp_dir: Path):
+        """Loads a saved model from the specified path."""
+        print("---Loading model from", temp_dir)
         
-        state = torch.load(model_path / "extra_state.pth")
+        state = torch.load(temp_dir / "extra_state.pth")
         self.starting_epoch = state["epoch"] + 1
         self.overfit = state["overfit"]
         self.max_validation_accuracy = state["max_validation_accuracy"]
 
         # if the model is not overfitting, load the model and optimizer
         if not self.overfit:
-            print("---Loading the model from", model_path)
+            print("---Loading the model from", temp_dir)
             self.no_improvement_count = state["no_improvement_count"]
 
             # send the model to the device inside
-            self.model = DistilBertWithCustomHead.load_model(model_path / "model.pth", device=self.device)
+            self.model = DistilBertWithCustomHead.load_model(temp_dir / "model.pth", device=self.device)
 
             # load the optimizer state
             self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
-            self.optimizer.load_state_dict(torch.load(model_path / "optimizer.pth"))
+            self.optimizer.load_state_dict(torch.load(temp_dir / "optimizer.pth"))
 
             # check if the model is correctly loaded
             self._model_debug_prints()
@@ -123,8 +132,9 @@ class TextAutoML:
                 print("Activation:", name, module)
             elif isinstance(module, torch.nn.LayerNorm):
                 print("LayerNorm:", name, module)
+    
 
-    def fit(self) -> float:
+    def fit(self, save_dir) -> float:
         """
         Fits a model to the given dataset.
         If it is a test run the trial number is set to 0, otherwise it is set to the trial number.
@@ -132,8 +142,9 @@ class TextAutoML:
         print("---Loading and preparing data...")
 
         if self.overfit:
-            #TODO add a save path for overfit
-            return self.max_validation_accuracy
+            # TODO check if self.max_epochs-1 is true
+            self.save_extra_info(current_epoch=self.max_epochs - 1, save_dir=Path(save_dir))
+            return 1 - self.max_validation_accuracy
 
         dataset = SimpleTextDataset(
             self.train_texts, self.train_labels, self.tokenizer, self.token_length
@@ -150,10 +161,10 @@ class TextAutoML:
         # create the custom head
 
         # Training and validating
-        val_acc = self._train_loop(
+        train_accuracies, val_accuracies = self._train_loop(
             train_loader,
             val_loader,
-            save_path=self.save_path,
+            save_dir=save_dir
         )
 
         # Clear data loaders and datasets to free memory
@@ -162,13 +173,13 @@ class TextAutoML:
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-        return 1 - val_acc
+        return train_accuracies, val_accuracies, 1 - self.max_validation_accuracy
 
     def _train_loop(
         self, 
         train_loader: DataLoader,
         val_loader: DataLoader,
-        save_path: Path,
+        save_dir: str
     ):
         print("---Starting training loop...")
 
@@ -184,12 +195,10 @@ class TextAutoML:
         else:
             criterion = nn.CrossEntropyLoss()
 
-        start_epoch = 0
-        # handling checkpoint resume
-        validation_results = []
-        max_validation_accuracy = 0.0
+        train_accuracies = []
+        val_accuracies = []
+        for epoch in range(self.starting_epoch, self.max_epochs):
 
-        for epoch in range(start_epoch, self.max_epochs):            
             total_loss = 0
             train_preds = []
             train_labels_list = []
@@ -220,6 +229,8 @@ class TextAutoML:
 
             # Calculate training accuracy
             train_acc = accuracy_score(train_labels_list, train_preds)
+            train_accuracies.append((epoch, train_acc))
+            logger.info(f"Epoch {epoch + 1}, Loss: {total_loss:.4f}, Train Accuracy: {train_acc:.4f}")
             print(f"---Epoch {epoch + 1}, Loss: {total_loss:.4f}, Train Accuracy: {train_acc:.4f}")
 
             # Clear training data from memory
@@ -230,10 +241,9 @@ class TextAutoML:
             # Calculate validation accuracy
             val_preds, val_labels = self._predict(val_loader)
             val_acc = accuracy_score(val_labels, val_preds)
-            validation_results.append(val_acc)
+            val_accuracies.append((epoch, val_acc))
+            logger.info(f"Epoch {epoch + 1}, Validation Accuracy: {val_acc:.4f}")
             print(f"---Epoch {epoch + 1}, Validation Accuracy: {val_acc:.4f}")
-
-            tune.report(metrics={"val_acc": val_acc})
 
             # Clear validation data from memory
             del val_preds, val_labels
@@ -241,31 +251,49 @@ class TextAutoML:
                 torch.cuda.empty_cache()
 
             # check if the validation accuracy is the highest so far
-            if val_acc > max_validation_accuracy:
-                max_validation_accuracy = val_acc
-                print(f"---New best validation accuracy: {max_validation_accuracy:.4f} at epoch {epoch + 1}")
-                validation_results = []  # Reset validation results
+            if val_acc > self.max_validation_accuracy:
+                self.max_validation_accuracy = val_acc
+                print(f"---New best validation accuracy: {self.max_validation_accuracy:.4f} at epoch {epoch}")
+                self.no_improvement_count = 0  # Reset no improvement count
+            else:
+                self.no_improvement_count += 1
+                print(f"---No improvement in validation accuracy for {self.no_improvement_count} epochs.")
+                if self.no_improvement_count >= 3:
+                    print(f"---Early stopping at epoch {epoch + 1} due to no improvement in validation accuracy.")
+                    self.overfit = True
 
-                # Save the model state
-                if save_path is not None:
-                    file_name = f"epoch_{epoch + 1}_acc_{val_acc:.4f}"
-                    self.model.save_model(save_path, file_name)
+                    # save the extra info
+                    self.save_extra_info(current_epoch=self.max_epochs - 1, save_dir=Path(save_dir))
 
-            # early stopping, if there has been no improvement for the last 3 epochs
-            if len(validation_results) > 3 and all(val <= max_validation_accuracy for val in validation_results[-3:]):
-                print(f"---Early stopping at epoch {epoch + 1} due to no improvement in validation accuracy.")
-                break
+                    # Clean up training objects, at the end of training
+                    del criterion
+                    if 'class_weights' in locals():
+                        del class_weights
+                    # Force garbage collection to free memory
+                    gc.collect() 
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                    return
 
+        # TODO save the model
+        self.model.save_model(save_dir=save_dir)
+        self.save_optimizer(save_dir=save_dir)
+        self.save_extra_info(current_epoch=epoch, save_dir=Path(save_dir))
+
+        # doesnt usually do anything here anyways
         # Clean up training objects, at the end of training
         del criterion
         if 'class_weights' in locals():
             del class_weights
-        gc.collect()  # Force garbage collection
+        # Force garbage collection to free memory
+        gc.collect() 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         # return the last epoch's val_acc
-        return val_acc
 
+        return train_accuracies, val_accuracies
+
+    
     def _predict(self, val_loader: DataLoader):
         self.model.eval()
         preds = []
@@ -318,3 +346,18 @@ class TextAutoML:
             torch.cuda.empty_cache()
 
         return results
+
+    def save_optimizer(self, save_dir):
+        """Saves the optimizer state."""
+        save_dir = Path(save_dir)
+        optimizer_save_path = save_dir / "optimizer.pth"
+        torch.save(self.optimizer.state_dict(), optimizer_save_path)
+        print(f"---Optimizer state saved to {optimizer_save_path}")
+
+    def save_extra_info(self, current_epoch: int, save_dir: Path):
+        torch.save({
+            "epoch": current_epoch,
+            "max_validation_accuracy": self.max_validation_accuracy,
+            "overfit": self.overfit,
+            "no_improvement_count": self.no_improvement_count if not self.overfit else 0,
+            }, os.path.join(save_dir, "extra_state.pth"))

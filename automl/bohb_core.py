@@ -140,11 +140,7 @@ class TextAutoML:
 
         for epoch in range(self.starting_epoch, self.max_epochs):
             with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
-                self.save_extra_info(
-                    current_epoch=epoch,
-                    save_dir=Path(temp_checkpoint_dir),
-                    max_validation_accuracy=self.max_validation_accuracy
-                )
+                self.save_extra_info(current_epoch=epoch, save_dir=Path(temp_checkpoint_dir))
                 checkpoint = Checkpoint.from_directory(temp_checkpoint_dir)
                 tune.report(metrics={"val_acc": self.max_validation_accuracy}, checkpoint=checkpoint)
         return
@@ -300,9 +296,6 @@ class TextAutoML:
         del criterion
         if 'class_weights' in locals():
             del class_weights
-        gc.collect()  # Force garbage collection
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
         # return the last epoch's val_acc
         return val_acc
 

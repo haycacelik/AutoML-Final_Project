@@ -1,7 +1,4 @@
-from .optuna_core import (
-    TextAutoML,
-    SimpleTextDataset,
-)
+
 from .datasets import (
     AGNewsDataset,
     IMDBDataset,
