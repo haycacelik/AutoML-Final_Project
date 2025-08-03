@@ -17,11 +17,7 @@ from automl.bohb_core import TextAutoML
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 
-def load_analysis_from_checkpoints(dataset):
-    experiment_dir = PROJECT_ROOT / "experiments/bohb_results/bohb_exp"
-    analysis = ExperimentAnalysis(experiment_checkpoint_path=experiment_dir, default_metric="val_acc",
-                                  default_mode="max")
-
+def save_topk_delete_checkpoints(analysis: ExperimentAnalysis, dataset: str, top_k: int):
     # analysis.best_checkpoint  ->   Checkpoint(filesystem=local, path=C:/Users/deniz/PycharmProjects/AutoML-Final_Project/experiments/bohb_results/bohb_exp/imdb_lr1.0e-06_wd1.3e-05_ft4_dr0.44_2fcc6720/checkpoint_000008)
     # analysis.best_trial       ->   imdb_lr1.0e-06_wd1.3e-05_ft4_dr0.44_2fcc6720
     # analysis.best_config      ->   returns dict with the best ConfigSpace param values
@@ -34,7 +30,6 @@ def load_analysis_from_checkpoints(dataset):
     output_root.mkdir(parents=True, exist_ok=True)
 
     # Get top-k trials
-    top_k = 3
     top_trials = sorted(analysis.trials,
                         key=lambda t: t.last_result.get("val_acc", 0),
                         reverse=True)[:top_k]
@@ -60,7 +55,7 @@ def load_analysis_from_checkpoints(dataset):
 
     # Clean up all trial directories when done
     for trial in analysis.trials:
-        trial_dir = Path(experiment_dir / str(trial))
+        trial_dir = Path(analysis.experiment_path) / str(trial)
         for subdir in trial_dir.iterdir():
             if subdir.is_dir() and subdir.name.startswith("checkpoint_"):
                 shutil.rmtree(subdir, ignore_errors=True)
@@ -251,6 +246,8 @@ def BOHB(dataset, hidden_dim, hidden_layers, activation, use_layer_norm):
         log_to_file=True,  # Enable logging to files
     )
 
+    save_topk_delete_checkpoints(analysis, dataset, 4)
+
 if __name__ == "__main__":
-    # BOHB("imdb", hidden_dim=128, hidden_layers=2, activation="ReLU", use_layer_norm=True)
-    load_analysis_from_checkpoints("imdb")
+    BOHB("imdb", hidden_dim=128, hidden_layers=2, activation="ReLU", use_layer_norm=True)
+
