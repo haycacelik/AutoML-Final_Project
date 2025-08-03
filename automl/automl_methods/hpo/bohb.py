@@ -159,7 +159,7 @@ def train_model(config, data):
     if checkpoint:
         with checkpoint.as_directory() as checkpoint_dir:
             print("loading model from checkpoint")
-            automl.load_model(temp_dir = Path(checkpoint_dir))
+            automl.load_model(model_dir = Path(checkpoint_dir))
             # model.load_state_dict(torch.load(os.path.join(checkpoint_dir, "model.pt")))
             # optimizer.load_state_dict(torch.load(os.path.join(checkpoint_dir, "optimizer.pt")))
             # start_epoch = torch.load(os.path.join(checkpoint_dir, "extra_state.pt"))["epoch"] + 1

@@ -55,9 +55,6 @@ class TextAutoML:
         self.val_texts = val_df['text'].tolist()
         self.val_labels = val_df['label'].tolist()
 
-        self.best_model_state = None  # To store the best model's state dict
-        self.best_optimizer_state = None  # To store the best optimizer's state dict
-
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
         print("---learning rate", self.lr)
@@ -124,18 +121,21 @@ class TextAutoML:
 
 
     def save_best_model(self):
-        """Saves the current model and optimizer state as the best model."""
-        self.best_model_state = self.model.state_dict()
-        self.best_optimizer_state = self.optimizer.state_dict()
-        print("---Saved best model state")
+        checkpoint_path = Path("best_model_temp.pth")
+        torch.save({
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict()
+        }, checkpoint_path)
+        self.best_model_checkpoint_path = checkpoint_path
+        print("---Saved best model to disk")
 
 
     def load_best_model(self):
-        """Loads the best saved model state."""
-        if self.best_model_state is not None:
-            self.model.load_state_dict(self.best_model_state)
-            self.optimizer.load_state_dict(self.best_optimizer_state)
-            print("---Loaded best model state")
+        if hasattr(self, "best_model_checkpoint_path") and self.best_model_checkpoint_path.exists():
+            checkpoint = torch.load(self.best_model_checkpoint_path, map_location=self.device)
+            self.model.load_state_dict(checkpoint['model_state_dict'])
+            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            print("---Loaded best model from disk")
 
     def _model_debug_prints(self):
         """Prints debug information about the model."""
