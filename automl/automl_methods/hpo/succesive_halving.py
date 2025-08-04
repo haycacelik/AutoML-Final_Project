@@ -1,0 +1,167 @@
+
+from automl.optuna_core import TextAutoML
+import optuna
+from functools import partial
+from automl.automl_methods.hpo.our_method import objective
+
+class SUCCESSIVE_HALVING:
+    def __init__(self, 
+                all_trials, 
+                budget, 
+                reduction_factor=2, 
+                last_trial_id=None, 
+                distributions=None, 
+                total_layer_budget=32, 
+                load_study_names=[None, None, None, None]):
+        """
+        configs: list of configs
+        budgets: budgets for each sh (e.g. [2, 4, 8, 16])
+        the budget: the number of epoch for each layer in the successive halving (32)
+        reduction_factor: fraction of configs to keep after each round (e.g. 2 means keep half)
+        load_study_names: list of study names to load, if not given it will create a new study [None, None, None, None]
+        """
+        # in config have the trial_id, load_path and params
+        self.all_trials = all_trials
+        self.budgets = budget
+        self.total_layer_budget = total_layer_budget
+        self.reduction_factor = reduction_factor
+        self.last_trial_id = last_trial_id
+        self.distributions = distributions
+        self.load_study_names = load_study_names
+
+    def successive_halving(self, 
+                           normalized_class_weights, 
+                           seed, 
+                           train_df, 
+                           val_df, 
+                           optuna_study_path, 
+                           num_classes, 
+                           optuna_study_name,
+                           output_path):
+        """
+        configs: list of configs
+        budgets: list of budgets to try, increasing (e.g. [2,4,8,16])
+        reduction_factor: fraction of configs to keep after each round (e.g. 2 means keep half)
+        """
+        results = []
+        for layer_idx, budget in enumerate(self.budgets):
+            # if the budget is 32 and budget for this round is 
+            config_count = int(self.total_layer_budget / budget)
+            results = []  # Reset results for each budget
+            # if its not the first budget eliminate half of the configs
+            sampler = optuna.samplers.TPESampler(
+                n_startup_trials=20,   # Number of random trials before using TPE
+                seed=42,
+                multivariate=True,  # Enable multivariate sampling
+            )
+            study = optuna.create_study(
+                direction="minimize",
+                sampler=sampler,
+                study_name=optuna_study_name,
+                storage=f"sqlite:///{optuna_study_path / f'study_layer_{layer_idx+2}.db'}",
+                )
+            
+            objective_fn = partial(
+                objective,
+                epochs=budget,
+                seed=seed,
+                train_df=train_df,
+                val_df=val_df,
+                num_classes=num_classes,
+                output_path=optuna_study_path,
+                normalized_class_weights=normalized_class_weights,
+            )
+            
+            for trial in self.all_trials.values():
+                if trial["stopped"] == True:
+                    print(f"Skipping trial {trial['trial_id']} with best val {trial['best_val_err']} as it has already been stopped.")
+                    continue
+
+                automl = TextAutoML(
+                    normalized_class_weights=normalized_class_weights,
+                    seed=seed,
+                    token_length=trial["params"]["token_length"],
+                    max_epochs=budget,
+                    batch_size=64,
+                    lr=trial["params"]["lr"],
+                    weight_decay=trial["params"]["weight_decay"],
+                    train_df=train_df,
+                    val_df=val_df,
+                    )
+                
+                automl.load_model(trial["load_path"])
+                # this is for when we are loading a model that has already been trained for some epochs
+                val_accuracies, val_err = automl.fit(save_dir=optuna_study_path / f"trial_{trial['trial_id']}")
+                results.append((trial["trial_id"], val_err, val_accuracies))
+
+                # change the config to have the val_accuracies
+                trial["val_accuracies"].append(val_accuracies)
+                trial["best_val_err"] = val_err
+                trial["load_path"] = optuna_study_path / f"trial_{trial['trial_id']}"
+
+                calculated_trial = optuna.trial.create_trial(
+                    params=trial["params"],
+                    distributions=self.distributions,
+                    value=val_err,
+                )
+                study.add_trial(calculated_trial)
+
+            # every time we evaluate, print the results of all trials
+            for trial in self.all_trials.values():
+                print(f"Trial {trial['trial_id']} - Best Val Err: {trial['best_val_err']} - Stopped: {trial['stopped']}")
+
+            # ELIMINATION PHASE OF EACH BUDGET
+            # Sort results by validation error (lower is better)
+            results.sort(key=lambda x: x[1])
+            print("Results after training for budget {}:".format(budget))
+
+            # Keep top fraction of trials based on validation error
+            sample = True
+            if self.reduction_factor*2 > config_count:
+                n_to_keep = 1
+                sample = False
+            elif self.reduction_factor*2 == config_count:
+                n_to_keep = 2
+                sample = False
+            else:
+                n_to_keep = int(config_count / (self.reduction_factor*2))
+            top_trials = results[:n_to_keep]
+            print(f"Keeping top {n_to_keep} trials")
+            top_trials_ids = [trial[0] for trial in top_trials]
+
+            for one_trial in self.all_trials.values():
+                # if the trial is in the top trials, keep it, otherwise stop it
+                if one_trial["trial_id"] in top_trials_ids:
+                    one_trial["stopped"] = False
+                else:
+                    one_trial["stopped"] = True
+
+            if sample:
+                # next budget sampling phase, samples and optimizes n to keep trials
+                print(f"at layer {layer_idx+1}, sampling {n_to_keep} trials from {config_count} trials")
+                study.optimize(objective_fn, n_trials=n_to_keep)
+                for study_trial in study.trials:
+                    if study_trial.state == optuna.trial.TrialState.COMPLETE and study_trial.number > config_count - 1:
+                        self.last_trial_id += 1
+                        self.all_trials[f"trial_{self.last_trial_id}"] = {
+                            "trial_id": self.last_trial_id, # if trial id is lower than 24 it random, every one after that is a tpe sampled
+                            "load_path": output_path / self.load_study_names[layer_idx] / f"trial_{self.last_trial_id}" if self.load_study_names[layer_idx] != None else optuna_study_path / f"trial_{self.last_trial_id}",
+                            "params": study_trial.params,
+                            "val_accuracies": study_trial.user_attrs.get("val_accuracies", []),
+                            "best_val_err": study_trial.value,
+                            "stopped": False
+                        }
+
+        return
+    
+    def get_best_trial(self):
+        """
+        Get the best trial from all trials
+        """
+        best_trial = None
+        best_val_err = float('inf')
+        for trial in self.all_trials.values():
+            if not trial["stopped"] and trial["best_val_err"] < best_val_err:
+                best_val_err = trial["best_val_err"]
+                best_trial = trial
+        return best_trial

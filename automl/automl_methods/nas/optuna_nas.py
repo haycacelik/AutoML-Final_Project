@@ -4,7 +4,7 @@ import torch
 import gc
 import wandb
 
-def tpe_objective(trial, epochs, lr, batch_size, seed, token_length,
+def objective(trial, epochs, lr, batch_size, seed, token_length,
                      weight_decay,
                      train_df, val_df, num_classes, output_path, normalized_class_weights, wandb_run):
     trial_id = trial.number
@@ -52,7 +52,7 @@ def tpe_objective(trial, epochs, lr, batch_size, seed, token_length,
 def run_nas(output_path, dataset, seed):
     
     # implement NAS
-    from automl.automl_methods.nas.optuna_nas import tpe_objective
+    from automl.automl_methods.nas.optuna_nas import objective
     n_trials = 15  # Number of trials to run
     print(f"Running NAS with {n_trials} trials")
 
@@ -87,7 +87,7 @@ def run_nas(output_path, dataset, seed):
     )
 
     objective_fn = partial(
-        tpe_objective,
+        objective,
         epochs=epochs,
         lr=lr,
         batch_size=batch_size,

@@ -7,7 +7,6 @@ from ray.tune.schedulers import HyperBandForBOHB
 from ray.tune.search.bohb import TuneBOHB
 import ConfigSpace as CS
 from automl import AGNewsDataset, IMDBDataset, AmazonReviewsDataset, DBpediaDataset
-from automl.datasets import get_fraction_of_data
 from automl.bohb_core import TextAutoML
 
 
@@ -47,7 +46,7 @@ def load_data(dataset: str,
     # Get the dataset and create dataloaders
     data_path = Path(data_path) if isinstance(data_path, str) else data_path
     data_info = dataset_class(data_path).create_dataloaders(val_size=val_percentage, random_state=seed,
-                                                            use_class_weights=True)
+                                                            use_class_weights=True, data_fraction=0.5)
 
     train_df = data_info['train_df']
     val_df = data_info.get('val_df', None)
@@ -57,12 +56,7 @@ def load_data(dataset: str,
         normalized_class_weights = data_info["normalized_class_weights"]
     else:
         normalized_class_weights = None
-
-    # if i want to use like 0.5 so half of the data i can do it here, useful for successive halving
-    if data_fraction < 1:
-        print(f"Subsampling training data to {data_fraction * 100}%")
-        train_df = get_fraction_of_data(train_df, data_fraction)
-
+        
     print(f"Train size: {len(train_df)}, Validation size: {len(val_df)}, Test size: {len(test_df)}")
 
     return train_df, val_df, num_classes, normalized_class_weights
@@ -126,7 +120,7 @@ def BOHB(dataset, hidden_dim, hidden_layers, activation, use_layer_norm):
         CS.Constant("data_path", "data"),
         CS.Constant("data_fraction", 1.0),
         CS.Constant("batch_size", 64), # its better to use the biggest possible batch size for your GPU
-        CS.CategoricalHyperparameter("token_length", [64, 128, 256, 512]),
+        CS.CategoricalHyperparameter("token_length", [64, 128, 256]),
         # CS.CategoricalHyperparameter("batch_size", [16, 32, 64]),
         CS.UniformFloatHyperparameter("weight_decay", 1e-6, 0.1, log=True),
         CS.UniformFloatHyperparameter("lr", 1e-6, 1e-3, log=True),
@@ -144,11 +138,11 @@ def BOHB(dataset, hidden_dim, hidden_layers, activation, use_layer_norm):
                                       reduction_factor=3,
                                       )
 
-    train_df, val_df, num_classes, normalized_class_weights = load_data("imdb",
+    train_df, val_df, num_classes, normalized_class_weights = load_data(dataset,
                                               data_path=Path(PROJECT_ROOT / "data"),
                                               val_percentage=0.2,
                                               seed=42,
-                                              data_fraction=1.0,
+                                              data_fraction=0.5,
                                               )
     print("running BOHB with the following parameters:")
 
@@ -179,5 +173,5 @@ def BOHB(dataset, hidden_dim, hidden_layers, activation, use_layer_norm):
 
 
 if __name__ == "__main__":
-    BOHB("imdb", hidden_dim=128, hidden_layers=2, activation="ReLU", use_layer_norm=True)
+    BOHB("ag_news", hidden_dim=128, hidden_layers=2, activation="ReLU", use_layer_norm=True)
 

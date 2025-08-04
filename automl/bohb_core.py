@@ -88,7 +88,7 @@ class TextAutoML:
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
         # check if the model is correctly created
-        self._model_debug_prints()
+        # self._model_debug_prints()
 
         self.overfit = False
         self.max_validation_accuracy = 0.0
@@ -118,7 +118,7 @@ class TextAutoML:
             self.optimizer.load_state_dict(torch.load(temp_dir / "optimizer.pth"))
 
             # check if the model is correctly loaded
-            self._model_debug_prints()
+            # self._model_debug_prints()
 
     def _model_debug_prints(self):
         """Prints debug information about the model."""
@@ -268,7 +268,7 @@ class TextAutoML:
             else:
                 self.no_improvement_count += 1
                 print(f"---No improvement in validation accuracy for {self.no_improvement_count} epochs.")
-                if self.no_improvement_count >= 3:
+                if self.no_improvement_count >= 2:
                     print(f"---Early stopping at epoch {epoch + 1} due to no improvement in validation accuracy.")
                     self.overfit = True
 

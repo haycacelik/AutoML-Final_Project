@@ -153,6 +153,10 @@ class DistilBertWithCustomHead(nn.Module):
         
         # Save model
         save_dir = Path(save_dir)
+        #if dir does not exist, create it
+        save_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save the model state to a file
         model_path = save_dir / f"model.pth"
         torch.save(model_state, model_path)
         

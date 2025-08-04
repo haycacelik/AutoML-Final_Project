@@ -1,7 +1,7 @@
 # first layer 
 import optuna
 from pathlib import Path
-from automl.automl_methods.nas.optuna_nas import tpe_objective
+from automl.automl_methods.nas.optuna_nas import objective
 print("Starting the AutoML run...")  # Debugging line to check if the script starts correctly
 import optuna
 print("Optuna imported successfully")  # Debugging line to check if Optuna imports correctly
@@ -11,19 +11,25 @@ import torch
 import gc
 import wandb
 from functools import partial
+import optuna.visualization as vis
 
-def tpe_objective(trial, epochs, seed, train_df, val_df, num_classes, output_path, normalized_class_weights):
-    # TODO use this with the paths
+def objective(trial, epochs, seed, train_df, val_df, num_classes, output_path, normalized_class_weights):
     trial_id = trial.number
 
-    hidden_dim = trial.suggest_categorical(f"hidden_size", [64, 128, 256])
-    activation = trial.suggest_categorical("activation_function", ["ReLU", "GELU", "LeakyReLU"])
-    hidden_layer = trial.suggest_int("hidden_layers", 1, 4)
-    use_layer_norm = trial.suggest_categorical("use_layer_norm", [True, False])
+    # hidden_dim = trial.suggest_categorical(f"hidden_size", [64, 128, 256])
+    # activation = trial.suggest_categorical("activation_function", ["ReLU", "GELU", "LeakyReLU"])
+    # hidden_layer = trial.suggest_int("hidden_layers", 1, 4)
+    # use_layer_norm = trial.suggest_categorical("use_layer_norm", [True, False])
+
+    hidden_dim = 128
+    activation = "ReLU"
+    hidden_layer = 2
+    use_layer_norm = True
+
     lr = trial.suggest_float("lr", 1e-6, 1e-2, log=True)
-    token_length = trial.suggest_categorical("token_length", [64, 128, 256, 512])
+    token_length = trial.suggest_categorical("token_length", [64, 128, 256])
     weight_decay = trial.suggest_float("weight_decay", 1e-6, 0.1, log=True)
-    amount_of_layers_to_finetune = trial.suggest_float("amount_of_layers_to_finetune", 0.0, 1.0)
+    amount_of_layers_to_finetune = trial.suggest_int("amount_of_layers_to_finetune", 0,6)
     dropout_rate = trial.suggest_float("dropout_rate", 0.0, 0.5)
     batch_size = 64
 
@@ -46,14 +52,12 @@ def tpe_objective(trial, epochs, seed, train_df, val_df, num_classes, output_pat
         classification_head_activation=activation,
         num_classes=num_classes,
         use_layer_norm=use_layer_norm
-
     )
 
     # val_err = automl.fit(output_path = output_path)
-    train_accuracies, val_accuracies, val_err = automl.fit(output_path = output_path)
+    val_accuracies, val_err = automl.fit(save_dir = output_path / f"trial_{trial_id}")
 
     # because we want to make a plot once its all over
-    trial.set_user_attr("train_accuracies", train_accuracies)
     trial.set_user_attr("val_accuracies", val_accuracies)
 
     # Clean up automl object to free memory
@@ -64,29 +68,12 @@ def tpe_objective(trial, epochs, seed, train_df, val_df, num_classes, output_pat
     
     return val_err
 
-def sh_objective(trial, epochs, seed, train_df, val_df, num_classes, output_path, normalized_class_weights):
-    
-    
 
-    def objective(trial):
-        # Select a fixed config index from a trial parameter
-        idx = trial.suggest_int("config_idx", 0, len(configs)-1)
-        config = configs[idx]
+def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normalized_class_weights, dataset, load_study_name=None, load_study=False):
 
-        for step in range(10):
-            # Dummy validation error decreases as epochs increase
-            val_error = 1.0 / ((step + 1) * config["lr"] * 100)
-            trial.report(val_error, step)
-            if trial.should_prune():
-                raise optuna.TrialPruned()
+    if load_study and load_study_name is None:
+        raise ValueError("You need to provide a load_study_name to load a study.")
 
-        return val_error
-
-    study = optuna.create_study(pruner=optuna.pruners.SuccessiveHalvingPruner())
-
-    study.optimize(objective, n_trials=len(configs))
-
-def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normalized_class_weights, dataset):
     for i in range (0,10):
         optuna_study_name = f"optuna_{i+1}"
         # check if folder exists
@@ -97,9 +84,9 @@ def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normali
             break
         if i == 9:
             raise ValueError(f"You already have 10 in {output_path}, please remove some.")
-        
+
     wandb_run = wandb.init(
-        project="text-automl",
+        project="text-automl-optuna",
         name=f"nas_{dataset}_seed{seed}_{optuna_study_name}",
         config={
             "dataset": dataset,
@@ -112,7 +99,7 @@ def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normali
         tags=[dataset, "distilbert", "text-classification", "hpo"]  # Add tags for easy filtering
     )
 
-    ## START OF LAYER 1
+    # ## START OF LAYER 1
     # Create a TPESampler with custom parameters
     sampler = optuna.samplers.TPESampler(
         n_startup_trials=24,   # Number of random trials before using TPE
@@ -121,7 +108,7 @@ def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normali
     )
 
     objective_fn = partial(
-        tpe_objective,
+        objective,
         epochs=1,
         seed=seed,
         train_df=train_df,
@@ -136,106 +123,184 @@ def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normali
         direction="minimize",
         sampler=sampler,
         study_name=optuna_study_name,
-        storage=f"sqlite:///{optuna_study_path / 'study.db'}",
+        storage=f"sqlite:///{optuna_study_path / 'study_layer_1.db'}",
         )
 
-    study_first_layer.optimize(objective_fn, n_trials=32)
+    if load_study is False:
+        study_first_layer.optimize(objective_fn, n_trials=32+8)
+    else:
+        # Load study from the database
+        study_load_path = output_path / load_study_name / "study.db"
+        old_study = optuna.load_study(
+            study_name=load_study_name,
+            storage=f"sqlite:///{study_load_path}",
+        )
+        for trial in old_study.trials:
+            # this is only added because when i was debugging i accidentally addded trials with no value
+            # normally there should be no trials with no value
+            if trial.value is not None:
+                study_first_layer.add_trial(trial)
+
+    # The tpe phase 
 
     # 32 trials have been completed
-    # Now: ask TPE for 8 new configurations
-    new_trials = []
-    for _ in range(8):
-        trial = study_first_layer.ask()  # This uses the TPE sampler now
-        params = trial.params  # These are your new sampled params
-        new_trials.append(params)
+    first_layer_trials = [trial for trial in study_first_layer.trials if trial.state == optuna.trial.TrialState.COMPLETE and trial.number <= 31]
+    top_trials = sorted(first_layer_trials, key=lambda t: t.value)[:8]
+    for trial in top_trials:
+        print(f"Top Trial {trial.number}: Value = {trial.value}, Params = {trial.params}")
 
-    # Optionally print
-    for i, p in enumerate(new_trials):
-        print(f"New Config {i+1}: {p}")
-
-    top_trials = study_first_layer.best_trials[:8]  # Top 8 trials by objective value
-    for i, trial in enumerate(top_trials):
-        print(f"Top {i+1} Trial:")
-        print(f"  Value: {trial.value}")
-        print(f"  Params: {trial.params}")
-
-
-    # for all trials get their val_accuracies list
-    all_train_accuracies = {}
-    all_val_accuracies = {}
+    all_trials = {}
     for trial in study_first_layer.trials:
-        # if trial.state == optuna.trial.TrialState.COMPLETE:
-        train_accuracies = trial.user_attrs.get("train_accuracies", [])
-        val_accuracies = trial.user_attrs.get("val_accuracies", [])
-        all_train_accuracies[trial.number] = train_accuracies
-        all_val_accuracies[trial.number] = val_accuracies
+        if trial.state == optuna.trial.TrialState.COMPLETE:
+            all_trials[f"trial_{trial.number}"] = {
+                "trial_id": trial.number, # if trial id is lower than 24 it random, every one after that is a tpe sampled
+                "load_path": output_path / load_study_name / f"trial_{trial.number}" if load_study else optuna_study_path / f"trial_{trial.number}",
+                "params": trial.params,
+                "val_accuracies": trial.user_attrs.get("val_accuracies", []),
+                "best_val_err": trial.value,
+                "stopped": False if trial in top_trials or trial.number > 31 else True
+            }
+
+    # make plots from what the tpe has seen so far
+    # plots_dir = optuna_study_path / "plots"
+    # plots_dir.mkdir(exist_ok=True)
+    # plots(study_first_layer, plots_dir)
+
 
     ### START OF SECOND PHASE ### 16 samples will be trained for 2 epochs
     # from here just succesive halving
-    # new_trials is a list of parameters for the new trials
-    results = []
-    # now evaluate the new trials
-    for new_trial_idx, param in enumerate(new_trials):
-        trial_idx = study_first_layer.trials[-1].number + new_trial_idx + 1  # New trial index
-        # create new model with the new parameters
-        automl = TextAutoML(
+    from automl.automl_methods.hpo.succesive_halving import SUCCESSIVE_HALVING
+
+    successive_halving = SUCCESSIVE_HALVING(
+        all_trials=all_trials,
+        budget=[2, 4, 8, 16],  # Budgets for each round
+        total_layer_budget=32,
+        reduction_factor=2,
+        last_trial_id=39,
+        distributions=study_first_layer.best_trial.distributions,
+        load_study_names=
+    )
+    successive_halving.successive_halving(
         normalized_class_weights=normalized_class_weights,
         seed=seed,
-        token_length= param["token_length"],
-        max_epochs= 4,
-        batch_size= param["batch_size"],
-        lr= param["lr"],
-        weight_decay= param["weight_decay"],
         train_df=train_df,
         val_df=val_df,
+        optuna_study_path=optuna_study_path,
+        num_classes=num_classes,
+        optuna_study_name=optuna_study_name,
+        output_path=output_path
+    )
+
+    # get the best config from all trials
+    best_trial = successive_halving.get_best_trial()
+    print(f"Best Trial: {best_trial['trial_id']} with Value = {best_trial['best_val_err']}, Params = {best_trial['params']}")
+
+    # close wandb run
+    wandb_run.finish()
+
+def plots(study, plots_dir, all_trials):
+    print("Saving optimization plots...")
+
+    # manual plot
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(10, 6))
+
+    for trial in all_trials.items():
+        trial_id = trial["trial_id"]
+        results = trial["val_accuracies"]
+        epochs, values = zip(*results)
+        plt.plot(epochs, values, label=f'Trial {trial_id}', marker='o')
+
+    plt.xlabel("Epoch")
+    plt.ylabel("Validation Error")
+    plt.title("Validation Error over Epochs for Each Trial")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+
+    # Save the plot and close the figure
+    plt.savefig("val_error_over_epochs.png")
+    plt.close()
+
+    try:
+        fig = vis.plot_param_importances(study)
+        fig.write_html(plots_dir / "param_importances.html")
+        print("Saved parameter importances plot")
+    except Exception as e:
+        print(f"Error saving parameter importances plot: {e}")
+
+    try:
+        fig = vis.plot_timeline(study)
+        fig.write_html(plots_dir / "timeline.html")
+        print("Saved timeline plot")
+    except Exception as e:
+        print(f"Error saving timeline plot: {e}")
+
+    try:
+        fig = vis.plot_optimization_history(study)
+        fig.write_html(plots_dir / "optimization_history.html")
+        print("Saved optimization history plot")
+    except Exception as e:
+        print(f"Error saving optimization history: {e}")
+
+    try:
+        fig = vis.plot_param_importances(
+            study, target=lambda t: t.duration.total_seconds(), target_name="duration"
         )
-        automl.create_model(
-            fraction_layers_to_finetune= param["amount_of_layers_to_finetune"],
-            classification_head_hidden_dim= param["hidden_dim"],
-            classification_head_dropout_rate= param["dropout_rate"],
-            classification_head_hidden_layers= param["hidden_layers"],
-            classification_head_activation= param["activation"],
-            num_classes=num_classes,
-            use_layer_norm= param["use_layer_norm"]
-        )
-        train_accuracies, val_accuracies, val_err = automl.fit(output_path = output_path)
-        results.append((new_trial_idx, val_err))
-        all_train_accuracies[trial_idx] = train_accuracies
-        all_val_accuracies[trial_idx] = val_accuracies
+        fig.write_html(plots_dir / "param_importances_duration.html")
+        print("Saved parameter importances (duration) plot")
+    except Exception as e:
+        print(f"Error saving parameter importances duration plot: {e}")
+    try:
+        fig = vis.plot_contour(study)
+        fig.write_html(plots_dir / "contour.html")
+        print("Saved contour plot")
+    except Exception as e:
+        print(f"Error saving contour plot: {e}")
 
-    for idx, trial in enumerate(top_trials):
-        # continue training the top trials
-        trial_id = trial.number
-        params = trial.params
+    try:
+        fig = vis.plot_edf(study)
+        fig.write_html(plots_dir / "edf.html")
+        print("Saved EDF plot")
+    except Exception as e:
+        print(f"Error saving EDF plot: {e}")
 
-        # TODO load the model with the parameters of the trial
-        automl = TextAutoML(
-        normalized_class_weights=normalized_class_weights,
-        seed=seed,
-        token_length= param["token_length"],
-        max_epochs= 4,
-        batch_size= param["batch_size"],
-        lr= param["lr"],
-        weight_decay= param["weight_decay"],
-        train_df=train_df,
-        val_df=val_df,
-        )
+    try:
+        fig = vis.plot_intermediate_values(study)
+        fig.write_html(plots_dir / "intermediate_values.html")
+        print("Saved intermediate values plot")
+    except Exception as e:
+        print(f"Error saving intermediate values plot: {e}")
 
-        automl.load_model(temp_dir= load_path)
-        train_accuracies, val_accuracies, val_err = automl.fit(output_path = output_path)
-        results.append((trial_id, val_err))
-        # append the train accuracies to the all_train_accuracies dict
-        all_train_accuracies[trial_id].append(train_accuracies)
-        all_val_accuracies[trial_id].append(val_accuracies)
+    try:
+        fig = vis.plot_parallel_coordinate(study)
+        fig.write_html(plots_dir / "parallel_coordinate.html")
+        print("Saved parallel coordinate plot")
+    except Exception as e:
+        print(f"Error saving parallel coordinate plot: {e}")
 
-    # Sort results by validation error, low to high
-    results.sort(key=lambda x: x[1])  # Sort by validation error (second element)
-    
-    # Select the top 8 trials based on validation error
-    top_trials = results[:8]
+    try:
+        fig = vis.plot_param_importances(study)
+        fig.write_html(plots_dir / "param_importances.html")
+        print("Saved parameter importances plot")
+    except Exception as e:
+        print(f"Error saving parameter importances plot: {e}")
 
-    ## END OF SECOND PHASE ##
-    ## START OF THIRD PHASE ##
+    try:
+        fig = vis.plot_rank(study)
+        fig.write_html(plots_dir / "rank.html")
+        print("Saved rank plot")
+    except Exception as e:
+        print(f"Error saving rank plot: {e}")
 
-### THIRD PHASE
-### FOURTH PHASE
+    try:
+        fig = vis.plot_slice(study)
+        fig.write_html(plots_dir / "slice.html")
+        print("Saved slice plot")
+    except Exception as e:
+        print(f"Error saving slice plot: {e}")
+
+
+
+

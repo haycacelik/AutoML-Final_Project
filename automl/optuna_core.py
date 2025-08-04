@@ -87,7 +87,7 @@ class TextAutoML:
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
         # check if the model is correctly created
-        self._model_debug_prints()
+        # self._model_debug_prints()
 
         self.overfit = False
         self.max_validation_accuracy = 0.0
@@ -117,7 +117,11 @@ class TextAutoML:
             self.optimizer.load_state_dict(torch.load(temp_dir / "optimizer.pth"))
 
             # check if the model is correctly loaded
-            self._model_debug_prints()
+            # self._model_debug_prints()
+
+        if self.starting_epoch >= self.max_epochs:
+            print(f"---Model has already been trained for {self.max_epochs} epochs, starting from epoch {self.starting_epoch}")
+            raise ValueError(f"---Model has already been trained for {self.max_epochs} epochs")
 
     def _model_debug_prints(self):
         """Prints debug information about the model."""
@@ -161,7 +165,7 @@ class TextAutoML:
         # create the custom head
 
         # Training and validating
-        train_accuracies, val_accuracies = self._train_loop(
+        val_accuracies = self._train_loop(
             train_loader,
             val_loader,
             save_dir=save_dir
@@ -173,7 +177,7 @@ class TextAutoML:
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-        return train_accuracies, val_accuracies, 1 - self.max_validation_accuracy
+        return val_accuracies, 1 - self.max_validation_accuracy
 
     def _train_loop(
         self, 
@@ -195,7 +199,6 @@ class TextAutoML:
         else:
             criterion = nn.CrossEntropyLoss()
 
-        train_accuracies = []
         val_accuracies = []
         for epoch in range(self.starting_epoch, self.max_epochs):
 
@@ -229,9 +232,6 @@ class TextAutoML:
 
             # Calculate training accuracy
             train_acc = accuracy_score(train_labels_list, train_preds)
-            train_accuracies.append((epoch, train_acc))
-            logger.info(f"Epoch {epoch + 1}, Loss: {total_loss:.4f}, Train Accuracy: {train_acc:.4f}")
-            print(f"---Epoch {epoch + 1}, Loss: {total_loss:.4f}, Train Accuracy: {train_acc:.4f}")
 
             # Clear training data from memory
             del train_preds, train_labels_list
@@ -242,8 +242,8 @@ class TextAutoML:
             val_preds, val_labels = self._predict(val_loader)
             val_acc = accuracy_score(val_labels, val_preds)
             val_accuracies.append((epoch, val_acc))
-            logger.info(f"Epoch {epoch + 1}, Validation Accuracy: {val_acc:.4f}")
-            print(f"---Epoch {epoch + 1}, Validation Accuracy: {val_acc:.4f}")
+            logger.info(f"Epoch {epoch + 1}, Train Accuracy: {train_acc:.4f}, Validation Accuracy: {val_acc:.4f}")
+            print(f"---Epoch {epoch + 1}, Train Accuracy: {train_acc:.4f}, Validation Accuracy: {val_acc:.4f}")
 
             # Clear validation data from memory
             del val_preds, val_labels
@@ -253,7 +253,7 @@ class TextAutoML:
             # check if the validation accuracy is the highest so far
             if val_acc > self.max_validation_accuracy:
                 self.max_validation_accuracy = val_acc
-                print(f"---New best validation accuracy: {self.max_validation_accuracy:.4f} at epoch {epoch}")
+                print(f"---New best validation accuracy: {self.max_validation_accuracy:.4f} at epoch {epoch + 1}")
                 self.no_improvement_count = 0  # Reset no improvement count
             else:
                 self.no_improvement_count += 1
@@ -291,7 +291,8 @@ class TextAutoML:
             torch.cuda.empty_cache()
         # return the last epoch's val_acc
 
-        return train_accuracies, val_accuracies
+        print("val_accuracies", val_accuracies)
+        return val_accuracies
 
     
     def _predict(self, val_loader: DataLoader):

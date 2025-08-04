@@ -43,7 +43,8 @@ class BaseTextDataset(ABC):
         val_size: float = 0.2,
         random_state: int = 42,
         set_class_count_min: bool = False,
-        use_class_weights: bool = True
+        use_class_weights: bool = True,
+        data_fraction: float = 1.0
     ) -> Dict[str, Any]:
         """Create train/validation/test dataloaders and preprocessing objects."""
         train_df, test_df = self.load_data()  # not implemented in base class `BaseTextDataset`
@@ -76,6 +77,9 @@ class BaseTextDataset(ABC):
         if val_df is not None:
             val_df['text'] = val_df['text'].apply(self.preprocess_text)
         test_df['text'] = test_df['text'].apply(self.preprocess_text)
+
+        if data_fraction < 1:
+            train_df = self.get_fraction_of_data(train_df, fraction=data_fraction)
 
         return {
             'train_df': train_df,
@@ -121,8 +125,19 @@ class BaseTextDataset(ABC):
         # print("class weights", class_weights, type(class_weights))
         normalized_class_weights = class_weights * (len(class_instance_counts) / np.sum(class_weights))
         # print("normalized class weights", normalized_class_weights, type(normalized_class_weights))
-
         return normalized_class_weights
+    
+    def get_fraction_of_data(self, df: pd.DataFrame, fraction: float) -> pd.DataFrame:
+        """Get a fraction of the data."""
+        print(f"Subsampling training data to {fraction * 100}%")
+
+        _subsample = np.random.choice(
+            list(range(len(df))),
+            size=int(fraction * len(df)),
+            replace=False,
+        )
+        df = df.iloc[_subsample]
+        return df
 
 class AGNewsDataset(BaseTextDataset):
     """AG News dataset for news categorization (4 classes)."""
@@ -197,12 +212,3 @@ class DBpediaDataset(BaseTextDataset):
 
         return train_df, test_df
 
-def get_fraction_of_data(self, df: pd.DataFrame, fraction: float) -> pd.DataFrame:
-        """Get a fraction of the data."""
-        _subsample = np.random.choice(
-            list(range(len(df))),
-            size=int(fraction * len(df)),
-            replace=False,
-        )
-        df = df.iloc[_subsample]
-        return df
