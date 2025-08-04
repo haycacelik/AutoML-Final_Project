@@ -200,50 +200,50 @@ class TextAutoML:
         val_accuracies = []
         for epoch in range(self.starting_epoch, self.max_epochs):
 
-            total_loss = 0
-            train_preds = []
-            train_labels_list = []
+            # total_loss = 0
+            # train_preds = []
+            # train_labels_list = []
             
-            for batch_idx, batch in enumerate(train_loader):
-                self.model.train()
-                self.optimizer.zero_grad()
+            # for batch_idx, batch in enumerate(train_loader):
+            #     self.model.train()
+            #     self.optimizer.zero_grad()
 
-                inputs = {k: v.to(self.device) for k, v in batch.items()}
-                loss, logits = self.model.forward(inputs, criterion)  # Forward pass
-                labels = inputs['labels']
-                loss.backward()
-                self.optimizer.step()
-                total_loss += loss.item()
+            #     inputs = {k: v.to(self.device) for k, v in batch.items()}
+            #     loss, logits = self.model.forward(inputs, criterion)  # Forward pass
+            #     labels = inputs['labels']
+            #     loss.backward()
+            #     self.optimizer.step()
+            #     total_loss += loss.item()
                 
-                # Collect predictions and labels for training accuracy
-                with torch.no_grad():
-                    preds = torch.argmax(logits, dim=1)
-                    train_preds.extend(preds.cpu().numpy())
-                    train_labels_list.extend(labels.cpu().numpy())
+            #     # Collect predictions and labels for training accuracy
+            #     with torch.no_grad():
+            #         preds = torch.argmax(logits, dim=1)
+            #         train_preds.extend(preds.cpu().numpy())
+            #         train_labels_list.extend(labels.cpu().numpy())
 
-                # Clear variables to free GPU memory
-                del inputs, loss, logits, labels, preds
+            #     # Clear variables to free GPU memory
+            #     del inputs, loss, logits, labels, preds
 
-                # Clear CUDA cache every 10 batches to balance memory management and performance
-                if batch_idx % 10 == 0 and torch.cuda.is_available():
-                    torch.cuda.empty_cache()
+            #     # Clear CUDA cache every 10 batches to balance memory management and performance
+            #     if batch_idx % 10 == 0 and torch.cuda.is_available():
+            #         torch.cuda.empty_cache()
 
-            # Calculate training accuracy
-            train_acc = accuracy_score(train_labels_list, train_preds)
+            # # Calculate training accuracy
+            # train_acc = accuracy_score(train_labels_list, train_preds)
 
-            # Clear training data from memory
-            del train_preds, train_labels_list
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            # # Clear training data from memory
+            # del train_preds, train_labels_list
+            # if torch.cuda.is_available():
+            #     torch.cuda.empty_cache()
 
-            # Calculate validation accuracy
-            val_preds, val_labels = self._predict(val_loader)
-            val_acc = accuracy_score(val_labels, val_preds)
-            # if epoch < 3 :
-            #     val_acc = self.max_validation_accuracy + 0.01
-            # else:
-            #     val_acc = 0.0
-            # train_acc = 0.5
+            # # Calculate validation accuracy
+            # val_preds, val_labels = self._predict(val_loader)
+            # val_acc = accuracy_score(val_labels, val_preds)
+            if epoch < 3 :
+                val_acc = self.max_validation_accuracy + 0.01
+            else:
+                val_acc = 0.0
+            train_acc = 0.5
             
             logger.info(f"Epoch {epoch + 1}, Train Accuracy: {train_acc:.4f}, Validation Accuracy: {val_acc:.4f}")
             print(f"---Epoch {epoch + 1}, Train Accuracy: {train_acc:.4f}, Validation Accuracy: {val_acc:.4f}")

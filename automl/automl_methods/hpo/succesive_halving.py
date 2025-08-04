@@ -215,7 +215,7 @@ class SUCCESSIVE_HALVING:
                             "stopped": False
                         }
 
-        return
+        return self.all_trials
     
     def get_best_trial(self):
         """

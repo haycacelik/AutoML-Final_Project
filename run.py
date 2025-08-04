@@ -2,13 +2,10 @@ import numpy as np
 from pathlib import Path
 from sklearn.metrics import accuracy_score, classification_report
 import yaml
-import wandb
 from wandb.sdk.wandb_run import Run
 import time
 print("Starting the AutoML run...")  # Debugging line to check if the script starts correctly
 print("Optuna imported successfully")  # Debugging line to check if Optuna imports correctly
-from functools import partial
-
 from automl.optuna_core import TextAutoML
 from automl.datasets import (
     AGNewsDataset,
@@ -45,7 +42,7 @@ def load_data(dataset: str,
     # Get the dataset and create dataloaders
     data_path = Path(data_path) if isinstance(data_path, str) else data_path
     data_info = dataset_class(data_path).create_dataloaders(val_size=val_percentage, random_state=seed,
-                                                            use_class_weights=True, data_fraction=0.5)
+                                                            use_class_weights=True, data_fraction=data_fraction)
 
     train_df = data_info['train_df']
     val_df = data_info.get('val_df', None)
@@ -143,25 +140,25 @@ def main_loop(
         #     with test_output_path.open("wb") as f:
         #         np.save(f, test_preds)
 
-        # # Check if test_labels has missing data
-        # if not np.isnan(test_labels).any():
-        #     acc = accuracy_score(test_labels, test_preds)
-        #     print(f"Accuracy on test set: {acc}")
+        # Check if test_labels has missing data
+        if not np.isnan(test_labels).any():
+            acc = accuracy_score(test_labels, test_preds)
+            print(f"Accuracy on test set: {acc}")
 
-        #     with (output_path / "score.yaml").open("a+") as f:
-        #         yaml.safe_dump({"test_err": float(1-acc)}, f)
+            with (output_path / "score.yaml").open("a+") as f:
+                yaml.safe_dump({"test_err": float(1-acc)}, f)
             
-        #     # Log detailed classification report for better insight
-        #     print("Classification Report:")
-        #     report = classification_report(test_labels, test_preds)
-        #     print(f"\n{report}")
-        # else:
-        #     # This is the setting for the exam dataset, you will not have access to the labels
-        #     print(f"No test labels available for dataset '{dataset}'")
+            # Log detailed classification report for better insight
+            print("Classification Report:")
+            report = classification_report(test_labels, test_preds)
+            print(f"\n{report}")
+        else:
+            # This is the setting for the exam dataset, you will not have access to the labels
+            print(f"No test labels available for dataset '{dataset}'")
 
-    # add total execution time to the results file, also make the results file better.
-    with (output_path / "score.yaml").open("a+") as f:
-        yaml.safe_dump({"total_execution_time": elapsed_time}, f)
+        # add total execution time to the results file, also make the results file better.
+        with (output_path / "score.yaml").open("a+") as f:
+            yaml.safe_dump({"total_execution_time": elapsed_time}, f)
 
     return
 

@@ -9,7 +9,7 @@ print("Optuna imported successfully")  # Debugging line to check if Optuna impor
 from automl.optuna_core import TextAutoML
 import torch
 import gc
-import wandb
+# import wandb
 from functools import partial
 import optuna.visualization as vis
 
@@ -88,20 +88,20 @@ def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normali
         if i == 9:
             raise ValueError(f"You already have 10 in {output_path}, please remove some.")
 
-    # start the wandb run
-    wandb_run = wandb.init(
-        project="text-automl-optuna",
-        name=f"nas_{dataset}_seed{seed}_{optuna_study_name}",
-        config={
-            "dataset": dataset,
-            "seed": seed,
-            "epochs": max_epochs,
-            "train_size": len(train_df),
-            "val_size": len(val_df) if val_df is not None else 0,
-            "num_classes": num_classes
-        },
-        tags=[dataset, "distilbert", "text-classification", "hpo"]  # Add tags for easy filtering
-    )
+    # # start the wandb run
+    # wandb_run = wandb.init(
+    #     project="text-automl-optuna",
+    #     name=f"nas_{dataset}_seed{seed}_{optuna_study_name}",
+    #     config={
+    #         "dataset": dataset,
+    #         "seed": seed,
+    #         "epochs": max_epochs,
+    #         "train_size": len(train_df),
+    #         "val_size": len(val_df) if val_df is not None else 0,
+    #         "num_classes": num_classes
+    #     },
+    #     tags=[dataset, "distilbert", "text-classification", "hpo"]  # Add tags for easy filtering
+    # )
 
     # ## START OF LAYER 1 ##
     # in this layer the configs are all sampled from the tpe, the tpe is random until 24 configs are evaluated.
@@ -189,7 +189,7 @@ def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normali
         last_trial_id=39,
         distributions=study_first_layer.best_trial.distributions,
     )
-    successive_halving.successive_halving(
+    all_trials = successive_halving.successive_halving(
         normalized_class_weights=normalized_class_weights,
         seed=seed,
         train_df=train_df,
@@ -200,6 +200,8 @@ def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normali
       
     )
     final_plot(all_trials, plots_dir)
+    for trial in all_trials.values():
+        print(f"Trial ID {trial['trial_id']} accuracy : {1 - trial['best_val_err']}, stopped at epoch: {trial['stopped']}")
 
     # get the best config from all trials
     best_trial = successive_halving.get_best_trial()
@@ -238,12 +240,16 @@ def final_plot(all_trials, plots_dir):
     for trial in all_trials.values():
         trial_id = trial["trial_id"]
         results = trial["val_accuracies"]
-        last_epoch = trial["stopped"] if trial["stopped"] != False else 16
+        last_epoch = 16  # Default last epoch if not stopped
+        if trial["stopped"] is False:
+            # If the trial is not stopped, we assume it ran for 16 epochs
+            last_epoch = 16
 
         values_list = []
         previous_val = results[0][1]
+        first_epoch = results[0][0]
 
-        for epoch in range(0, last_epoch):
+        for epoch in range(first_epoch, last_epoch):
             result = next((t[1] for t in results if t[0] == epoch), None)
             if result is None:
                 result = previous_val
