@@ -148,7 +148,7 @@ class TextAutoML:
         if self.overfit:
             # TODO check if self.max_epochs-1 is true
             self.save_extra_info(current_epoch=self.max_epochs - 1, save_dir=Path(save_dir))
-            return 1 - self.max_validation_accuracy
+            return [], 1 - self.max_validation_accuracy
 
         dataset = SimpleTextDataset(
             self.train_texts, self.train_labels, self.tokenizer, self.token_length
@@ -241,7 +241,7 @@ class TextAutoML:
             # Calculate validation accuracy
             val_preds, val_labels = self._predict(val_loader)
             val_acc = accuracy_score(val_labels, val_preds)
-            val_accuracies.append((epoch, val_acc))
+            # val_accuracies.append((epoch, val_acc))
             logger.info(f"Epoch {epoch + 1}, Train Accuracy: {train_acc:.4f}, Validation Accuracy: {val_acc:.4f}")
             print(f"---Epoch {epoch + 1}, Train Accuracy: {train_acc:.4f}, Validation Accuracy: {val_acc:.4f}")
 
@@ -255,6 +255,7 @@ class TextAutoML:
                 self.max_validation_accuracy = val_acc
                 print(f"---New best validation accuracy: {self.max_validation_accuracy:.4f} at epoch {epoch + 1}")
                 self.no_improvement_count = 0  # Reset no improvement count
+                val_accuracies.append((epoch, val_acc))  # Append the best validation accuracy
             else:
                 self.no_improvement_count += 1
                 print(f"---No improvement in validation accuracy for {self.no_improvement_count} epochs.")
@@ -273,7 +274,7 @@ class TextAutoML:
                     gc.collect() 
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
-                    return
+                    return val_accuracies
 
         # TODO save the model
         self.model.save_model(save_dir=save_dir)

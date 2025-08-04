@@ -2,7 +2,67 @@
 from automl.optuna_core import TextAutoML
 import optuna
 from functools import partial
-from automl.automl_methods.hpo.our_method import objective
+import torch
+import gc
+
+def objective(trial, epochs, seed, train_df, val_df, num_classes, output_path, normalized_class_weights, last_id, config_count):
+    # +1 bucause both trail.number and last_id start at 0 so its 1 too little
+    #   40         16         39       - 16    + 1
+    #   41         17         39        -16    +1
+    #   45         8          44       - 8     + 1
+    trial_id = trial.number + last_id - config_count + 1
+
+    # hidden_dim = trial.suggest_categorical(f"hidden_size", [64, 128, 256])
+    # activation = trial.suggest_categorical("activation_function", ["ReLU", "GELU", "LeakyReLU"])
+    # hidden_layer = trial.suggest_int("hidden_layers", 1, 4)
+    # use_layer_norm = trial.suggest_categorical("use_layer_norm", [True, False])
+
+    hidden_dim = 128
+    activation = "ReLU"
+    hidden_layer = 2
+    use_layer_norm = True
+
+    lr = trial.suggest_float("lr", 1e-6, 1e-2, log=True)
+    token_length = trial.suggest_categorical("token_length", [64, 128, 256])
+    weight_decay = trial.suggest_float("weight_decay", 1e-6, 0.1, log=True)
+    amount_of_layers_to_finetune = trial.suggest_int("amount_of_layers_to_finetune", 0,6)
+    dropout_rate = trial.suggest_float("dropout_rate", 0.0, 0.5)
+    batch_size = 64
+
+    automl = TextAutoML(
+        normalized_class_weights=normalized_class_weights,
+        seed=seed,
+        token_length=token_length,
+        max_epochs=epochs,
+        batch_size=batch_size,
+        lr=lr,
+        weight_decay=weight_decay,
+        train_df=train_df,
+        val_df=val_df,
+    )
+    automl.create_model(
+        fraction_layers_to_finetune=amount_of_layers_to_finetune,
+        classification_head_hidden_dim=hidden_dim,
+        classification_head_dropout_rate=dropout_rate,
+        classification_head_hidden_layers=hidden_layer,
+        classification_head_activation=activation,
+        num_classes=num_classes,
+        use_layer_norm=use_layer_norm
+    )
+
+    # val_err = automl.fit(output_path = output_path)
+    val_accuracies, val_err = automl.fit(save_dir = output_path / f"trial_{trial_id}")
+
+    # because we want to make a plot once its all over
+    trial.set_user_attr("val_accuracies", val_accuracies)
+
+    # Clean up automl object to free memory
+    del automl
+    gc.collect()  # Force garbage collection
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    
+    return val_err
 
 class SUCCESSIVE_HALVING:
     def __init__(self, 
@@ -12,7 +72,7 @@ class SUCCESSIVE_HALVING:
                 last_trial_id=None, 
                 distributions=None, 
                 total_layer_budget=32, 
-                load_study_names=[None, None, None, None]):
+                ):
         """
         configs: list of configs
         budgets: budgets for each sh (e.g. [2, 4, 8, 16])
@@ -27,7 +87,6 @@ class SUCCESSIVE_HALVING:
         self.reduction_factor = reduction_factor
         self.last_trial_id = last_trial_id
         self.distributions = distributions
-        self.load_study_names = load_study_names
 
     def successive_halving(self, 
                            normalized_class_weights, 
@@ -36,8 +95,7 @@ class SUCCESSIVE_HALVING:
                            val_df, 
                            optuna_study_path, 
                            num_classes, 
-                           optuna_study_name,
-                           output_path):
+                           optuna_study_name):
         """
         configs: list of configs
         budgets: list of budgets to try, increasing (e.g. [2,4,8,16])
@@ -70,10 +128,11 @@ class SUCCESSIVE_HALVING:
                 num_classes=num_classes,
                 output_path=optuna_study_path,
                 normalized_class_weights=normalized_class_weights,
+                last_id=self.last_trial_id,
+                config_count=config_count,
             )
-            
             for trial in self.all_trials.values():
-                if trial["stopped"] == True:
+                if trial["stopped"] != False:
                     print(f"Skipping trial {trial['trial_id']} with best val {trial['best_val_err']} as it has already been stopped.")
                     continue
 
@@ -95,7 +154,9 @@ class SUCCESSIVE_HALVING:
                 results.append((trial["trial_id"], val_err, val_accuracies))
 
                 # change the config to have the val_accuracies
-                trial["val_accuracies"].append(val_accuracies)
+                # TODO i think i should have done extend insteaad of append because print("val_accuracies", val_accuracies) gives val_accuracies [(1, 0.8726)]
+                trial["val_accuracies"].extend(val_accuracies)
+                print(f"val_accuracies: {trial['val_accuracies']}")
                 trial["best_val_err"] = val_err
                 trial["load_path"] = optuna_study_path / f"trial_{trial['trial_id']}"
 
@@ -134,7 +195,7 @@ class SUCCESSIVE_HALVING:
                 if one_trial["trial_id"] in top_trials_ids:
                     one_trial["stopped"] = False
                 else:
-                    one_trial["stopped"] = True
+                    one_trial["stopped"] = budget
 
             if sample:
                 # next budget sampling phase, samples and optimizes n to keep trials
@@ -145,7 +206,7 @@ class SUCCESSIVE_HALVING:
                         self.last_trial_id += 1
                         self.all_trials[f"trial_{self.last_trial_id}"] = {
                             "trial_id": self.last_trial_id, # if trial id is lower than 24 it random, every one after that is a tpe sampled
-                            "load_path": output_path / self.load_study_names[layer_idx] / f"trial_{self.last_trial_id}" if self.load_study_names[layer_idx] != None else optuna_study_path / f"trial_{self.last_trial_id}",
+                            "load_path": optuna_study_path / f"trial_{self.last_trial_id}",
                             "params": study_trial.params,
                             "val_accuracies": study_trial.user_attrs.get("val_accuracies", []),
                             "best_val_err": study_trial.value,

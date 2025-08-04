@@ -158,7 +158,7 @@ def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normali
                 "params": trial.params,
                 "val_accuracies": trial.user_attrs.get("val_accuracies", []),
                 "best_val_err": trial.value,
-                "stopped": False if trial in top_trials or trial.number > 31 else True
+                "stopped": False if trial in top_trials or trial.number > 31 else 1
             }
 
     # make plots from what the tpe has seen so far
@@ -178,7 +178,6 @@ def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normali
         reduction_factor=2,
         last_trial_id=39,
         distributions=study_first_layer.best_trial.distributions,
-        load_study_names=
     )
     successive_halving.successive_halving(
         normalized_class_weights=normalized_class_weights,
@@ -188,7 +187,7 @@ def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normali
         optuna_study_path=optuna_study_path,
         num_classes=num_classes,
         optuna_study_name=optuna_study_name,
-        output_path=output_path
+      
     )
 
     # get the best config from all trials
