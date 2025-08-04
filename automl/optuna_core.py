@@ -143,8 +143,6 @@ class TextAutoML:
         Fits a model to the given dataset.
         If it is a test run the trial number is set to 0, otherwise it is set to the trial number.
         """
-        print("---Loading and preparing data...")
-
         if self.overfit:
             # TODO check if self.max_epochs-1 is true
             self.save_extra_info(current_epoch=self.max_epochs - 1, save_dir=Path(save_dir))
@@ -241,7 +239,12 @@ class TextAutoML:
             # Calculate validation accuracy
             val_preds, val_labels = self._predict(val_loader)
             val_acc = accuracy_score(val_labels, val_preds)
-            # val_accuracies.append((epoch, val_acc))
+            # if epoch < 3 :
+            #     val_acc = self.max_validation_accuracy + 0.01
+            # else:
+            #     val_acc = 0.0
+            # train_acc = 0.5
+            
             logger.info(f"Epoch {epoch + 1}, Train Accuracy: {train_acc:.4f}, Validation Accuracy: {val_acc:.4f}")
             print(f"---Epoch {epoch + 1}, Train Accuracy: {train_acc:.4f}, Validation Accuracy: {val_acc:.4f}")
 
@@ -256,6 +259,10 @@ class TextAutoML:
                 print(f"---New best validation accuracy: {self.max_validation_accuracy:.4f} at epoch {epoch + 1}")
                 self.no_improvement_count = 0  # Reset no improvement count
                 val_accuracies.append((epoch, val_acc))  # Append the best validation accuracy
+                print(f"---Saving best model at epoch {epoch + 1} with validation accuracy {val_acc:.4f}")
+                self.model.save_model(save_dir=save_dir/"best_version")
+                self.save_optimizer(save_dir=save_dir/"best_version")
+                self.save_extra_info(current_epoch=epoch, save_dir=Path(save_dir) / "best_version")
             else:
                 self.no_improvement_count += 1
                 print(f"---No improvement in validation accuracy for {self.no_improvement_count} epochs.")
@@ -352,11 +359,16 @@ class TextAutoML:
     def save_optimizer(self, save_dir):
         """Saves the optimizer state."""
         save_dir = Path(save_dir)
+        if not save_dir.exists():
+            save_dir.mkdir(parents=True, exist_ok=True)
         optimizer_save_path = save_dir / "optimizer.pth"
         torch.save(self.optimizer.state_dict(), optimizer_save_path)
         print(f"---Optimizer state saved to {optimizer_save_path}")
 
     def save_extra_info(self, current_epoch: int, save_dir: Path):
+        # if path does not exist, create it
+        if not save_dir.exists():
+            save_dir.mkdir(parents=True, exist_ok=True)
         torch.save({
             "epoch": current_epoch,
             "max_validation_accuracy": self.max_validation_accuracy,

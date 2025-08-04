@@ -58,7 +58,7 @@ def load_data(dataset: str,
 
     print(f"Train size: {len(train_df)}, Validation size: {len(val_df)}, Test size: {len(test_df)}")
 
-    return train_df, val_df, num_classes, normalized_class_weights
+    return train_df, val_df, test_df, num_classes, normalized_class_weights
 
 def main_loop(
         dataset: str,
@@ -77,14 +77,14 @@ def main_loop(
     # get start time
     start_time = time.time()
 
-    train_df, val_df, num_classes, normalized_class_weights = load_data(dataset,
+    train_df, val_df, test_df, num_classes, normalized_class_weights = load_data(dataset,
                                               data_path=Path(data_path),
                                               val_percentage=0.2,
                                               seed=42,
                                               data_fraction=1.0,
                                               )
 
-    method(max_epochs=epochs,
+    best_n_trials = method(max_epochs=epochs,
            seed=seed,
            output_path=output_path,
            train_df=train_df,
@@ -92,8 +92,9 @@ def main_loop(
            num_classes=num_classes,
            normalized_class_weights=normalized_class_weights,
            dataset=dataset,
-           load_study = True,
-          load_study_name="optuna_4"
+           get_best_n_trials=3,  # Get this amount of best trials
+           load_study=True,
+           load_study_name="optuna_4"
            )
     
     # Print total execution time
@@ -103,81 +104,66 @@ def main_loop(
     elapsed_minutes = elapsed_time // 60
     elapsed_seconds = elapsed_time % 60
     print(f"Total execution time: {elapsed_minutes:.0f} minutes and {elapsed_seconds:.2f} seconds")
+    
+    for trial in best_n_trials:
+        automl = TextAutoML(
+            normalized_class_weights=normalized_class_weights,
+            seed=seed,
+            token_length=trial["params"]["token_length"],
+            max_epochs=epochs,
+            batch_size=64,
+            lr=trial["params"]["lr"],
+            weight_decay=trial["params"]["weight_decay"],
+            train_df=train_df,
+            val_df=val_df,
+            )
 
-    # # Initialize the TextAutoML instance with the best parameters
-    # automl = TextAutoML(
-    #     normalized_class_weights=normalized_class_weights,
-    #     # normalized_class_weights=None,
-    #     seed=seed,
-    #     token_length=token_length,
-    #     max_epochs=epochs,
-    #     batch_size=batch_size,
-    #     lr=lr,
-    #     weight_decay=weight_decay,
-    #     train_df=train_df,
-    #     val_df=val_df,
-    #     save_path=output_path,
-    #     wandb_logger=None, #
-    # )
-    # # if you want to load a pre-trained model
-    # automl.load_model(model_path=model_path)
+        # go one dir lower from trial["load_path"]
+        best_model_load_path = trial["load_path"] / "best_version"
+        automl.load_model(best_model_load_path)
 
-    # # Fit the AutoML model on the training and validation datasets, for single run
-    # val_err = automl.fit()
+        # Predict on the test set
+        test_preds, test_labels = automl.predict(test_df)
 
-    # # Print total execution time
-    # end_time = time.time()
-    # elapsed_time = end_time - start_time
-    # # turn it to minute and seconds
-    # elapsed_minutes = elapsed_time // 60
-    # elapsed_seconds = elapsed_time % 60
-    # print(f"Total execution time: {elapsed_minutes:.0f} minutes and {elapsed_seconds:.2f} seconds")
-    # # Log total execution time to wandb
-    # # wandb_nas_run.log({"total_execution_time": elapsed_time})
+        # Write the predictions of X_test to disk
+        print("Writing predictions to disk")
+        with (output_path / f"trial_{trial['trial_id']}_score.yaml").open("w") as f:
+            yaml.safe_dump({"val_err": float(trial["best_val_err"])}, f)
+        trial_id = trial['trial_id']
+        print(f"Saved validation score at {output_path / f'trial_{trial_id}_score.yaml'}")
+        with (output_path / f"trial_{trial_id}_test_preds.npy").open("wb") as f:
+            np.save(f, test_preds)
+        print(f"Saved test prediction at {output_path / f'trial_{trial_id}_test_preds.npy'}")
 
-    # # Predict on the test set
-    # test_preds, test_labels = automl.predict(test_df)
+        # # In case of running on the final exam data, also add the predictions.npy
+        # # to the correct location for auto evaluation.
+        # if dataset == FINAL_TEST_DATASET: 
+        #     test_output_path = output_path / "predictions.npy"
+        #     test_output_path.parent.mkdir(parents=True, exist_ok=True)
+        #     with test_output_path.open("wb") as f:
+        #         np.save(f, test_preds)
 
-    # # Write the predictions of X_test to disk
-    # print("Writing predictions to disk")
-    # with (output_path / "score.yaml").open("w") as f:
-    #     yaml.safe_dump({"val_err": float(val_err)}, f)
-    # print(f"Saved validation score at {output_path / 'score.yaml'}")
-    # with (output_path / "test_preds.npy").open("wb") as f:
-    #     np.save(f, test_preds)
-    # print(f"Saved test prediction at {output_path / 'test_preds.npy'}")
+        # # Check if test_labels has missing data
+        # if not np.isnan(test_labels).any():
+        #     acc = accuracy_score(test_labels, test_preds)
+        #     print(f"Accuracy on test set: {acc}")
 
-    # In case of running on the final exam data, also add the predictions.npy
-    # to the correct location for auto evaluation.
-    # if dataset == FINAL_TEST_DATASET: 
-    #     test_output_path = output_path / "predictions.npy"
-    #     test_output_path.parent.mkdir(parents=True, exist_ok=True)
-    #     with test_output_path.open("wb") as f:
-    #         np.save(f, test_preds)
+        #     with (output_path / "score.yaml").open("a+") as f:
+        #         yaml.safe_dump({"test_err": float(1-acc)}, f)
+            
+        #     # Log detailed classification report for better insight
+        #     print("Classification Report:")
+        #     report = classification_report(test_labels, test_preds)
+        #     print(f"\n{report}")
+        # else:
+        #     # This is the setting for the exam dataset, you will not have access to the labels
+        #     print(f"No test labels available for dataset '{dataset}'")
 
-    # # Check if test_labels has missing data
-    # if not np.isnan(test_labels).any():
-    #     acc = accuracy_score(test_labels, test_preds)
-    #     print(f"Accuracy on test set: {acc}")
+    # add total execution time to the results file, also make the results file better.
+    with (output_path / "score.yaml").open("a+") as f:
+        yaml.safe_dump({"total_execution_time": elapsed_time}, f)
 
-    #     with (output_path / "score.yaml").open("a+") as f:
-    #         yaml.safe_dump({"test_err": float(1-acc)}, f)
-        
-    #     # Log detailed classification report for better insight
-    #     print("Classification Report:")
-    #     report = classification_report(test_labels, test_preds)
-    #     print(f"\n{report}")
-    # else:
-    #     # This is the setting for the exam dataset, you will not have access to the labels
-    #     print(f"No test labels available for dataset '{dataset}'")
-
-    # # Log total execution time to wandb
-    # # TODO add it to the results file, also make the results file better.
-    # with (output_path / "score.yaml").open("a+") as f:
-    #     yaml.safe_dump({"total_execution_time": elapsed_time}, f)
-
-  
-    return val_err
+    return
 
 
 if __name__ == "__main__":

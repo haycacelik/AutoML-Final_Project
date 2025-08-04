@@ -16,6 +16,7 @@ import optuna.visualization as vis
 def objective(trial, epochs, seed, train_df, val_df, num_classes, output_path, normalized_class_weights):
     trial_id = trial.number
 
+    # the nas hyperparameters that we no longer use
     # hidden_dim = trial.suggest_categorical(f"hidden_size", [64, 128, 256])
     # activation = trial.suggest_categorical("activation_function", ["ReLU", "GELU", "LeakyReLU"])
     # hidden_layer = trial.suggest_int("hidden_layers", 1, 4)
@@ -69,11 +70,13 @@ def objective(trial, epochs, seed, train_df, val_df, num_classes, output_path, n
     return val_err
 
 
-def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normalized_class_weights, dataset, load_study_name=None, load_study=False):
+def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normalized_class_weights, dataset, get_best_n_trials, load_study_name=None, load_study=False):
 
+    # if you want to load a study you must provide a load_study_name
     if load_study and load_study_name is None:
         raise ValueError("You need to provide a load_study_name to load a study.")
 
+    # Create an output path for the study
     for i in range (0,10):
         optuna_study_name = f"optuna_{i+1}"
         # check if folder exists
@@ -85,6 +88,7 @@ def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normali
         if i == 9:
             raise ValueError(f"You already have 10 in {output_path}, please remove some.")
 
+    # start the wandb run
     wandb_run = wandb.init(
         project="text-automl-optuna",
         name=f"nas_{dataset}_seed{seed}_{optuna_study_name}",
@@ -99,7 +103,9 @@ def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normali
         tags=[dataset, "distilbert", "text-classification", "hpo"]  # Add tags for easy filtering
     )
 
-    # ## START OF LAYER 1
+    # ## START OF LAYER 1 ##
+    # in this layer the configs are all sampled from the tpe, the tpe is random until 24 configs are evaluated.
+    # the other 8 are not random
     # Create a TPESampler with custom parameters
     sampler = optuna.samplers.TPESampler(
         n_startup_trials=24,   # Number of random trials before using TPE
@@ -107,6 +113,7 @@ def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normali
         multivariate=True,  # Enable multivariate sampling
     )
 
+    # this is for passing the parameters to the objective function
     objective_fn = partial(
         objective,
         epochs=1,
@@ -118,7 +125,7 @@ def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normali
         normalized_class_weights=normalized_class_weights,
     )
 
-    # Load or create a study with completed 16 trials
+    # Create a study, if we want to leadone we will take the studies from the load study
     study_first_layer = optuna.create_study(
         direction="minimize",
         sampler=sampler,
@@ -126,8 +133,10 @@ def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normali
         storage=f"sqlite:///{optuna_study_path / 'study_layer_1.db'}",
         )
 
+    # if it is not loaded start optimizing 
     if load_study is False:
         study_first_layer.optimize(objective_fn, n_trials=32+8)
+    # if it is loaded is should already be optimized
     else:
         # Load study from the database
         study_load_path = output_path / load_study_name / "study.db"
@@ -162,9 +171,10 @@ def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normali
             }
 
     # make plots from what the tpe has seen so far
-    # plots_dir = optuna_study_path / "plots"
-    # plots_dir.mkdir(exist_ok=True)
-    # plots(study_first_layer, plots_dir)
+    plots_dir = optuna_study_path / "plots"
+    plots_dir.mkdir(exist_ok=True)
+    # plots(study=study_first_layer, all_trials=all_trials, plots_dir=plots_dir)
+    final_plot(all_trials, plots_dir)
 
 
     ### START OF SECOND PHASE ### 16 samples will be trained for 2 epochs
@@ -189,6 +199,7 @@ def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normali
         optuna_study_name=optuna_study_name,
       
     )
+    final_plot(all_trials, plots_dir)
 
     # get the best config from all trials
     best_trial = successive_halving.get_best_trial()
@@ -196,32 +207,74 @@ def method(max_epochs, seed, output_path, train_df, val_df, num_classes, normali
 
     # close wandb run
     wandb_run.finish()
+    
 
-def plots(study, plots_dir, all_trials):
-    print("Saving optimization plots...")
+    # we want to return the best n trials
+    sorted_trials = sorted(all_trials.values(), key=lambda x: x["best_val_err"])
+    best_n_trials = sorted_trials[:get_best_n_trials]
 
-    # manual plot
-    import matplotlib.pyplot as plt
+    return best_n_trials
 
-    plt.figure(figsize=(10, 6))
+def final_plot(all_trials, plots_dir):
 
-    for trial in all_trials.items():
+    import plotly.graph_objs as go
+
+    fig = go.Figure()
+
+    
+    # Define color map by trial ID range
+    def get_color(trial_id):
+        if 0 <= trial_id <= 31:
+            return 'red'
+        elif 32 <= trial_id <= 39:
+            return 'blue'
+        elif 40 <= trial_id <= 43:
+            return 'green'
+        elif 44 <= trial_id <= 45:
+            return 'yellow'
+        else:
+            return 'gray'  # fallback for unexpected IDs
+
+    for trial in all_trials.values():
         trial_id = trial["trial_id"]
         results = trial["val_accuracies"]
-        epochs, values = zip(*results)
-        plt.plot(epochs, values, label=f'Trial {trial_id}', marker='o')
+        last_epoch = trial["stopped"] if trial["stopped"] != False else 16
 
-    plt.xlabel("Epoch")
-    plt.ylabel("Validation Error")
-    plt.title("Validation Error over Epochs for Each Trial")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
+        values_list = []
+        previous_val = results[0][1]
 
-    # Save the plot and close the figure
-    plt.savefig("val_error_over_epochs.png")
-    plt.close()
+        for epoch in range(0, last_epoch):
+            result = next((t[1] for t in results if t[0] == epoch), None)
+            if result is None:
+                result = previous_val
+            values_list.append((epoch, result))
+            previous_val = result
 
+        epochs, values = zip(*values_list)
+        color = get_color(trial_id)
+
+        fig.add_trace(go.Scatter(
+            x=epochs,
+            y=values,
+            mode='lines+markers',
+            line=dict(color=color),
+            marker=dict(color=color),
+            name=f"Trial {trial_id}",  # This will show in the legend
+            showlegend=False,
+            hovertemplate=f'Trial {trial_id}<br>Epoch: %{{x}}<br>Value: %{{y}}'
+        ))
+
+    fig.update_layout(
+        title='Validation Accuracy per Epoch',
+        xaxis_title='Epoch',
+        yaxis_title='Validation Accuracy',
+        hovermode='x unified'
+    )
+
+    fig.write_html(plots_dir / "val_accuracy_plot.html")
+
+def plots(study, plots_dir):
+    print("Saving optimization plots...")
     try:
         fig = vis.plot_param_importances(study)
         fig.write_html(plots_dir / "param_importances.html")

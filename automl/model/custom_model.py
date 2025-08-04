@@ -195,8 +195,8 @@ class DistilBertWithCustomHead(nn.Module):
         del checkpoint
         
         print(f"Model loaded from {model_path}")
-        print(f"Architecture: {model_arch['base_model_name']} + Custom Head")
-        print(f"Classes: {model_arch['num_classes']}, Hidden: {model_arch['hidden_dim']}, Layers: {model_arch['num_hidden_layers']}")
+        # print(f"Architecture: {model_arch['base_model_name']} + Custom Head")
+        # print(f"Classes: {model_arch['num_classes']}, Hidden: {model_arch['hidden_dim']}, Layers: {model_arch['num_hidden_layers']}")
         
         return model
     

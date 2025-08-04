@@ -11,6 +11,9 @@ def objective(trial, epochs, seed, train_df, val_df, num_classes, output_path, n
     #   41         17         39        -16    +1
     #   45         8          44       - 8     + 1
     trial_id = trial.number + last_id - config_count + 1
+    print("compiling new trial with id", trial_id)
+    # dude just pass it and increment it
+    # last_id +=1 
 
     # hidden_dim = trial.suggest_categorical(f"hidden_size", [64, 128, 256])
     # activation = trial.suggest_categorical("activation_function", ["ReLU", "GELU", "LeakyReLU"])
@@ -186,15 +189,14 @@ class SUCCESSIVE_HALVING:
                 sample = False
             else:
                 n_to_keep = int(config_count / (self.reduction_factor*2))
+            print("---------------n to keep----------------- ", n_to_keep)
             top_trials = results[:n_to_keep]
             print(f"Keeping top {n_to_keep} trials")
             top_trials_ids = [trial[0] for trial in top_trials]
 
             for one_trial in self.all_trials.values():
-                # if the trial is in the top trials, keep it, otherwise stop it
-                if one_trial["trial_id"] in top_trials_ids:
-                    one_trial["stopped"] = False
-                else:
+                # if trial is still running, not in the top trials, stop it
+                if one_trial["trial_id"] not in top_trials_ids and one_trial["stopped"] == False:
                     one_trial["stopped"] = budget
 
             if sample:
