@@ -23,6 +23,9 @@ pyarrow = ">=12.0"       # Arrow format support
 neural-pipeline-search = "0.13.0"
 datasets = ">=2.0"
 transformers =  ">=4.20"
+optuna = "^3.6.0"        
+wandb = "^0.16.6"        
+plotly = "^5.22.0"     
 
 
 [build-system]

@@ -35,12 +35,12 @@ class CustomClassificationHead(nn.Module):
     def forward(self, x):
         return self.classifier(x)
     
-def freeze_layers(model, fraction_layers_to_finetune: float=1.0) -> None:
-    """Freeze layers in the model based on fraction to finetune. 
-    If the value is 1.0, then do not freeze any layers"""
+def freeze_layers(model, amount_of_layers_to_finetune: float=1.0) -> None:
+    """Freeze layers in the model based on aount of layers to finetune.
+    Since we only use distilbert and it has 6 layers, the max value is 6"""
     
     transformer = None
-    print("Freezing transformer layers based on fraction to finetune:", fraction_layers_to_finetune)
+    print("Freezing transformer layers based on fraction to finetune:", amount_of_layers_to_finetune)
     
     # Handle custom head model (DistilBertWithCustomHead)
     if hasattr(model, 'distilbert') and hasattr(model.distilbert, 'transformer'):
@@ -63,9 +63,8 @@ def freeze_layers(model, fraction_layers_to_finetune: float=1.0) -> None:
         return
     
     total_layers = len(transformer.layer)
-    _num_layers_to_finetune = int(fraction_layers_to_finetune * total_layers)
-    layers_to_freeze = total_layers - _num_layers_to_finetune
-
+    # _num_layers_to_finetune = int(amount_of_layers_to_finetune * total_layers)
+    layers_to_freeze = total_layers - amount_of_layers_to_finetune
     print(f"Freezing {layers_to_freeze}/{total_layers} transformer layers")
     
     for layer in transformer.layer[:layers_to_freeze]:
@@ -105,6 +104,7 @@ class DistilBertWithCustomHead(nn.Module):
             activation=self.classification_head_activation,
             use_layer_norm=use_layer_norm
         )
+
         
     def forward(self, inputs, loss_function):
         input_ids, attention_mask = inputs['input_ids'], inputs['attention_mask']
@@ -132,23 +132,10 @@ class DistilBertWithCustomHead(nn.Module):
 
         return logits
     
-    def save_model(self, save_path, filename):
+    def save_model(self,  save_dir):
         """Save the complete model including architecture and weights."""
-        save_path = Path(save_path)
-        best_model_save_path = save_path / "best_model"
-        if not best_model_save_path.exists():
-            best_model_save_path.mkdir(parents=True, exist_ok=True)
 
-        # If there are already files in the directory, move them to an "old" folder
-        if any(best_model_save_path.iterdir()):
-            # move the existing files to a old folder
-            old_folder = save_path / "old"
-            if not old_folder.exists():
-                old_folder.mkdir(parents=True, exist_ok=True)
-            # Convert to list to avoid modifying directory while iterating
-            for file in list(best_model_save_path.iterdir()):
-                file.rename(old_folder / file.name)
-
+        # TODO add optimizer and epoch to the model state
         # Save the complete model state dict
         model_state = {
             'model_state_dict': self.state_dict(),
@@ -161,23 +148,22 @@ class DistilBertWithCustomHead(nn.Module):
                 'activation': self.classification_head_activation,
                 'fraction_layers_to_finetune': self.fraction_layers_to_finetune,
                 'use_layer_norm': self.use_layer_norm
-            }
+            },
         }
         
         # Save model
-        model_path = best_model_save_path / f"{filename}.pth"
-        torch.save(model_state, model_path)
+        save_dir = Path(save_dir)
+        #if dir does not exist, create it
+        save_dir.mkdir(parents=True, exist_ok=True)
         
-        # Also save just the config as JSON for easy reading
-        config_path = best_model_save_path / f"{filename}_config.json"
-        with open(config_path, 'w') as f:
-            json.dump(model_state['model_architecture'], f, indent=2)
+        # Save the model state to a file
+        model_path = save_dir / f"model.pth"
+        torch.save(model_state, model_path)
         
         # Clean up model_state to free memory
         del model_state
         
         print(f"Model saved to {model_path}")
-        print(f"Config saved to {config_path}")
         return model_path
     
     @classmethod
@@ -209,8 +195,8 @@ class DistilBertWithCustomHead(nn.Module):
         del checkpoint
         
         print(f"Model loaded from {model_path}")
-        print(f"Architecture: {model_arch['base_model_name']} + Custom Head")
-        print(f"Classes: {model_arch['num_classes']}, Hidden: {model_arch['hidden_dim']}, Layers: {model_arch['num_hidden_layers']}")
+        # print(f"Architecture: {model_arch['base_model_name']} + Custom Head")
+        # print(f"Classes: {model_arch['num_classes']}, Hidden: {model_arch['hidden_dim']}, Layers: {model_arch['num_hidden_layers']}")
         
         return model
     

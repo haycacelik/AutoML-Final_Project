@@ -1,0 +1,706 @@
+trial_0:
+  best_val_err: 0.49234556504346483
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_0
+  params:
+    amount_of_layers_to_finetune: 1
+    dropout_rate: 0.02904180608409973
+    lr: 3.1489116479568635e-05
+    token_length: 64
+    weight_decay: 6.026889128682509e-06
+  stopped: 1
+  trial_id: 0
+  val_accuracies:
+  - - 0
+    - 0.5076544349565352
+trial_1:
+  best_val_err: 0.803061773982614
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_1
+  params:
+    amount_of_layers_to_finetune: 5
+    dropout_rate: 0.10616955533913808
+    lr: 0.0029154431891537554
+    token_length: 128
+    weight_decay: 0.07072114131472237
+  stopped: 1
+  trial_id: 1
+  val_accuracies:
+  - - 0
+    - 0.19693822601738595
+trial_10:
+  best_val_err: 0.8026002000153858
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_10
+  params:
+    amount_of_layers_to_finetune: 5
+    dropout_rate: 0.38563517334297287
+    lr: 0.001227380098785297
+    token_length: 256
+    weight_decay: 0.003422052903270693
+  stopped: 1
+  trial_id: 10
+  val_accuracies:
+  - - 0
+    - 0.1973997999846142
+trial_11:
+  best_val_err: 0.5313485652742518
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_11
+  params:
+    amount_of_layers_to_finetune: 2
+    dropout_rate: 0.03177917514301182
+    lr: 1.9777828512462715e-06
+    token_length: 256
+    weight_decay: 0.0013076473382928546
+  stopped: 1
+  trial_id: 11
+  val_accuracies:
+  - - 0
+    - 0.46865143472574816
+trial_12:
+  best_val_err: 0.4223401800138472
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_12
+  params:
+    amount_of_layers_to_finetune: 3
+    dropout_rate: 0.05979712296915085
+    lr: 1.753594952976443e-05
+    token_length: 128
+    weight_decay: 0.027293781650374743
+  stopped: 2
+  trial_id: 12
+  val_accuracies:
+  - - 0
+    - 0.557504423417186
+  - - 1
+    - 0.5776598199861528
+trial_13:
+  best_val_err: 0.5017309023771059
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_13
+  params:
+    amount_of_layers_to_finetune: 3
+    dropout_rate: 0.21377050917927481
+    lr: 0.0007128188058401369
+    token_length: 256
+    weight_decay: 0.00029442723591496795
+  stopped: 1
+  trial_id: 13
+  val_accuracies:
+  - - 0
+    - 0.49826909762289406
+trial_14:
+  best_val_err: 0.7225171167012847
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_14
+  params:
+    amount_of_layers_to_finetune: 3
+    dropout_rate: 0.4537832369630465
+    lr: 1.263794633808288e-06
+    token_length: 256
+    weight_decay: 3.730610475453592e-05
+  stopped: 1
+  trial_id: 14
+  val_accuracies:
+  - - 0
+    - 0.2774828832987153
+trial_15:
+  best_val_err: 0.46557427494422643
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_15
+  params:
+    amount_of_layers_to_finetune: 2
+    dropout_rate: 0.08061064362700221
+    lr: 9.935023909063694e-06
+    token_length: 128
+    weight_decay: 2.4260488932164474e-06
+  stopped: 1
+  trial_id: 15
+  val_accuracies:
+  - - 0
+    - 0.5344257250557736
+trial_16:
+  best_val_err: 0.7630586968228326
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_16
+  params:
+    amount_of_layers_to_finetune: 1
+    dropout_rate: 0.4462794992449889
+    lr: 0.005233480488540089
+    token_length: 256
+    weight_decay: 0.010431827200054901
+  stopped: 1
+  trial_id: 16
+  val_accuracies:
+  - - 0
+    - 0.23694130317716747
+trial_17:
+  best_val_err: 0.41503192553273327
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_17
+  params:
+    amount_of_layers_to_finetune: 1
+    dropout_rate: 0.21355389431312816
+    lr: 0.00014367095138664247
+    token_length: 128
+    weight_decay: 3.5502556123130782e-06
+  stopped: 2
+  trial_id: 17
+  val_accuracies:
+  - - 0
+    - 0.5725055773521041
+  - - 1
+    - 0.5849680744672667
+trial_18:
+  best_val_err: 0.515039618432187
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_18
+  params:
+    amount_of_layers_to_finetune: 1
+    dropout_rate: 0.0599326836668414
+    lr: 0.0018709365688887364
+    token_length: 64
+    weight_decay: 0.0001221954445633545
+  stopped: 1
+  trial_id: 18
+  val_accuracies:
+  - - 0
+    - 0.4849603815678129
+trial_19:
+  best_val_err: 0.5128086775905839
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_19
+  params:
+    amount_of_layers_to_finetune: 2
+    dropout_rate: 0.48589104136048034
+    lr: 2.2410971619109514e-05
+    token_length: 64
+    weight_decay: 0.0032741215209888836
+  stopped: 1
+  trial_id: 19
+  val_accuracies:
+  - - 0
+    - 0.4871913224094161
+trial_2:
+  best_val_err: 0.5062697130548504
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_2
+  params:
+    amount_of_layers_to_finetune: 2
+    dropout_rate: 0.30592644736118974
+    lr: 5.337032762603957e-06
+    token_length: 256
+    weight_decay: 0.00014445251022763054
+  stopped: 1
+  trial_id: 2
+  val_accuracies:
+  - - 0
+    - 0.49373028694514964
+trial_20:
+  best_val_err: 0.4789599199938457
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_20
+  params:
+    amount_of_layers_to_finetune: 0
+    dropout_rate: 0.3047821669899484
+    lr: 0.007076022085822013
+    token_length: 128
+    weight_decay: 2.6558434508499915e-05
+  stopped: 1
+  trial_id: 20
+  val_accuracies:
+  - - 0
+    - 0.5210400800061543
+trial_21:
+  best_val_err: 0.3896453573351796
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_21
+  params:
+    amount_of_layers_to_finetune: 1
+    dropout_rate: 0.2447263801387815
+    lr: 0.00010249816559563216
+    token_length: 256
+    weight_decay: 1.576919244719753e-05
+  stopped: 4
+  trial_id: 21
+  val_accuracies:
+  - - 0
+    - 0.594814985768136
+  - - 1
+    - 0.6103546426648204
+trial_22:
+  best_val_err: 0.803061773982614
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_22
+  params:
+    amount_of_layers_to_finetune: 5
+    dropout_rate: 0.1838915663596266
+    lr: 0.008761971101023697
+    token_length: 256
+    weight_decay: 1.5423669834226227e-05
+  stopped: 1
+  trial_id: 22
+  val_accuracies:
+  - - 0
+    - 0.19693822601738595
+trial_23:
+  best_val_err: 0.4625740441572429
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_23
+  params:
+    amount_of_layers_to_finetune: 2
+    dropout_rate: 0.09325925519992712
+    lr: 0.00033823872019362184
+    token_length: 64
+    weight_decay: 0.015014555442537684
+  stopped: 1
+  trial_id: 23
+  val_accuracies:
+  - - 0
+    - 0.5374259558427571
+trial_24:
+  best_val_err: 0.4540349257635202
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_24
+  params:
+    amount_of_layers_to_finetune: 3
+    dropout_rate: 0.11468216773107379
+    lr: 1.0832071908015662e-05
+    token_length: 128
+    weight_decay: 0.044414749429711034
+  stopped: 1
+  trial_id: 24
+  val_accuracies:
+  - - 0
+    - 0.5459650742364798
+trial_25:
+  best_val_err: 0.46988229863835684
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_25
+  params:
+    amount_of_layers_to_finetune: 1
+    dropout_rate: 0.29442914118827757
+    lr: 0.0002990126339887374
+    token_length: 64
+    weight_decay: 2.245098721629532e-06
+  stopped: 1
+  trial_id: 25
+  val_accuracies:
+  - - 0
+    - 0.5301177013616432
+trial_26:
+  best_val_err: 0.46480498499884604
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_26
+  params:
+    amount_of_layers_to_finetune: 0
+    dropout_rate: 0.20881361317016606
+    lr: 8.349952614422322e-05
+    token_length: 128
+    weight_decay: 1.1688424058611589e-05
+  stopped: 1
+  trial_id: 26
+  val_accuracies:
+  - - 0
+    - 0.535195015001154
+trial_27:
+  best_val_err: 0.4191860912377875
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_27
+  params:
+    amount_of_layers_to_finetune: 5
+    dropout_rate: 0.016162351877722192
+    lr: 1.197160085117402e-05
+    token_length: 128
+    weight_decay: 0.005713531069478315
+  stopped: 2
+  trial_id: 27
+  val_accuracies:
+  - - 0
+    - 0.5661973997999846
+  - - 1
+    - 0.5808139087622125
+trial_28:
+  best_val_err: 0.4491114701130856
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_28
+  params:
+    amount_of_layers_to_finetune: 6
+    dropout_rate: 0.05433401132693582
+    lr: 4.6781241926962135e-06
+    token_length: 128
+    weight_decay: 0.006873497492454779
+  stopped: 1
+  trial_id: 28
+  val_accuracies:
+  - - 0
+    - 0.5508885298869144
+trial_29:
+  best_val_err: 0.42734056465881987
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_29
+  params:
+    amount_of_layers_to_finetune: 6
+    dropout_rate: 0.018100106501261922
+    lr: 0.00020366221267487136
+    token_length: 128
+    weight_decay: 0.0004403979502335463
+  stopped: 2
+  trial_id: 29
+  val_accuracies:
+  - - 0
+    - 0.5605046542041695
+  - - 1
+    - 0.5726594353411801
+trial_3:
+  best_val_err: 0.5814293407185168
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_3
+  params:
+    amount_of_layers_to_finetune: 1
+    dropout_rate: 0.2571172192068058
+    lr: 3.6138942712165278e-06
+    token_length: 256
+    weight_decay: 0.008431013932082471
+  stopped: 1
+  trial_id: 3
+  val_accuracies:
+  - - 0
+    - 0.4185706592814832
+trial_30:
+  best_val_err: 0.4016462804831141
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_30
+  params:
+    amount_of_layers_to_finetune: 3
+    dropout_rate: 0.19958167972492438
+    lr: 0.0002005759686142587
+    token_length: 128
+    weight_decay: 6.3368666523274e-06
+  stopped: 2
+  trial_id: 30
+  val_accuracies:
+  - - 0
+    - 0.5825832756365874
+  - - 1
+    - 0.5983537195168859
+trial_31:
+  best_val_err: 0.39287637510577733
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_31
+  params:
+    amount_of_layers_to_finetune: 1
+    dropout_rate: 0.19687574095771848
+    lr: 0.00010772134420120407
+    token_length: 256
+    weight_decay: 9.60011281373335e-06
+  stopped: 2
+  trial_id: 31
+  val_accuracies:
+  - - 0
+    - 0.5947380567735979
+  - - 1
+    - 0.6071236248942227
+trial_32:
+  best_val_err: 0.4054927302100162
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_32
+  params:
+    amount_of_layers_to_finetune: 1
+    dropout_rate: 0.15936870176988513
+    lr: 4.1865593847081074e-05
+    token_length: 256
+    weight_decay: 2.0581490423733332e-06
+  stopped: 2
+  trial_id: 32
+  val_accuracies:
+  - - 0
+    - 0.5771213170243865
+  - - 1
+    - 0.5945072697899838
+trial_33:
+  best_val_err: 0.4449573044080314
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_33
+  params:
+    amount_of_layers_to_finetune: 0
+    dropout_rate: 0.22875767711247072
+    lr: 3.3324866363586294e-05
+    token_length: 256
+    weight_decay: 2.85630817431088e-06
+  stopped: 2
+  trial_id: 33
+  val_accuracies:
+  - - 0
+    - 0.498115239633818
+  - - 1
+    - 0.5550426955919686
+trial_34:
+  best_val_err: 0.37241326255865836
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_34
+  params:
+    amount_of_layers_to_finetune: 2
+    dropout_rate: 0.13758649735018355
+    lr: 0.00016231644879672328
+    token_length: 256
+    weight_decay: 1.083065972091323e-06
+  stopped: -1
+  trial_id: 34
+  val_accuracies:
+  - - 0
+    - 0.6073544118778368
+  - - 1
+    - 0.6275867374413416
+trial_35:
+  best_val_err: 0.5267328256019694
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_35
+  params:
+    amount_of_layers_to_finetune: 4
+    dropout_rate: 0.24739157444149473
+    lr: 0.000760380327272826
+    token_length: 128
+    weight_decay: 1.9468706140485323e-06
+  stopped: 2
+  trial_id: 35
+  val_accuracies:
+  - - 0
+    - 0.44280329256096623
+  - - 1
+    - 0.4732671743980306
+trial_36:
+  best_val_err: 0.3784906531271637
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_36
+  params:
+    amount_of_layers_to_finetune: 3
+    dropout_rate: 0.22624833746428435
+    lr: 6.951811639480197e-05
+    token_length: 256
+    weight_decay: 1.4393654636901214e-05
+  stopped: 4
+  trial_id: 36
+  val_accuracies:
+  - - 0
+    - 0.594968843757212
+  - - 1
+    - 0.6214324178782983
+  - - 3
+    - 0.6215093468728363
+trial_37:
+  best_val_err: 0.37487499038387573
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_37
+  params:
+    amount_of_layers_to_finetune: 4
+    dropout_rate: 0.25774812765144295
+    lr: 0.00010336970212290828
+    token_length: 256
+    weight_decay: 5.939766188949389e-06
+  stopped: 16
+  trial_id: 37
+  val_accuracies:
+  - - 0
+    - 0.6072774828832987
+  - - 1
+    - 0.6251250096161243
+trial_38:
+  best_val_err: 0.4067235941226248
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_38
+  params:
+    amount_of_layers_to_finetune: 4
+    dropout_rate: 0.35748040497617417
+    lr: 0.0003833718986543833
+    token_length: 256
+    weight_decay: 7.938605010660764e-06
+  stopped: 2
+  trial_id: 38
+  val_accuracies:
+  - - 0
+    - 0.5868912993307177
+  - - 1
+    - 0.5932764058773752
+trial_39:
+  best_val_err: 0.39879990768520657
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_39
+  params:
+    amount_of_layers_to_finetune: 4
+    dropout_rate: 0.2131581605877144
+    lr: 1.3071709331809438e-05
+    token_length: 256
+    weight_decay: 1.788671854213299e-06
+  stopped: 2
+  trial_id: 39
+  val_accuracies:
+  - - 0
+    - 0.5896607431340872
+  - - 1
+    - 0.6012000923147934
+trial_4:
+  best_val_err: 0.5298869143780292
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_4
+  params:
+    amount_of_layers_to_finetune: 6
+    dropout_rate: 0.4828160165372797
+    lr: 0.00023423849847112912
+    token_length: 128
+    weight_decay: 2.114744796061573e-06
+  stopped: 1
+  trial_id: 4
+  val_accuracies:
+  - - 0
+    - 0.4701130856219709
+trial_40:
+  best_val_err: 0.4666512808677591
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_40
+  params:
+    amount_of_layers_to_finetune: 1
+    dropout_rate: 0.02904180608409973
+    lr: 3.1489116479568635e-05
+    token_length: 64
+    weight_decay: 6.026889128682509e-06
+  stopped: 4
+  trial_id: 40
+  val_accuracies:
+  - - 0
+    - 0.5080390799292254
+  - - 1
+    - 0.5225017309023771
+  - - 2
+    - 0.5308100623124856
+  - - 3
+    - 0.5333487191322409
+trial_41:
+  best_val_err: 0.8000615431956304
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_41
+  params:
+    amount_of_layers_to_finetune: 5
+    dropout_rate: 0.10616955533913808
+    lr: 0.0029154431891537554
+    token_length: 128
+    weight_decay: 0.07072114131472237
+  stopped: 4
+  trial_id: 41
+  val_accuracies:
+  - - 0
+    - 0.1966305100392338
+  - - 2
+    - 0.19993845680436956
+trial_42:
+  best_val_err: 0.42557119778444497
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_42
+  params:
+    amount_of_layers_to_finetune: 2
+    dropout_rate: 0.30592644736118974
+    lr: 5.337032762603957e-06
+    token_length: 256
+    weight_decay: 0.00014445251022763054
+  stopped: 4
+  trial_id: 42
+  val_accuracies:
+  - - 0
+    - 0.5098853757981383
+  - - 1
+    - 0.5509654588814524
+  - - 2
+    - 0.5665820447726748
+  - - 3
+    - 0.574428802215555
+trial_43:
+  best_val_err: 0.4621893991845527
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_43
+  params:
+    amount_of_layers_to_finetune: 1
+    dropout_rate: 0.2571172192068058
+    lr: 3.6138942712165278e-06
+    token_length: 256
+    weight_decay: 0.008431013932082471
+  stopped: 4
+  trial_id: 43
+  val_accuracies:
+  - - 0
+    - 0.42464804984998844
+  - - 1
+    - 0.5007308254481114
+  - - 2
+    - 0.5264251096238172
+  - - 3
+    - 0.5378106008154473
+trial_44:
+  best_val_err: 0.45895838141395495
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_44
+  params:
+    amount_of_layers_to_finetune: 1
+    dropout_rate: 0.02904180608409973
+    lr: 3.1489116479568635e-05
+    token_length: 64
+    weight_decay: 6.026889128682509e-06
+  stopped: 8
+  trial_id: 44
+  val_accuracies:
+  - - 0
+    - 0.5080390799292254
+  - - 1
+    - 0.5225017309023771
+  - - 2
+    - 0.5322717132087084
+  - - 3
+    - 0.5354258019847681
+  - - 4
+    - 0.541041618586045
+trial_45:
+  best_val_err: 0.8033694899607662
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_45
+  params:
+    amount_of_layers_to_finetune: 5
+    dropout_rate: 0.10616955533913808
+    lr: 0.0029154431891537554
+    token_length: 128
+    weight_decay: 0.07072114131472237
+  stopped: 8
+  trial_id: 45
+  val_accuracies:
+  - - 0
+    - 0.1966305100392338
+trial_5:
+  best_val_err: 0.4311100853911839
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_3/trial_5
+  params:
+    amount_of_layers_to_finetune: 0
+    dropout_rate: 0.2475884550556351
+    lr: 0.0017123375973163992
+    token_length: 256
+    weight_decay: 0.00015876781526924017
+  stopped: 2
+  trial_id: 5
+  val_accuracies:
+  - - 0
+    - 0.5571967074390338
+  - - 1
+    - 0.5688899146088161
+trial_6:
+  best_val_err: 0.6602046311254712
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_6
+  params:
+    amount_of_layers_to_finetune: 3
+    dropout_rate: 0.2733551396716398
+    lr: 1.3726318898045876e-06
+    token_length: 64
+    weight_decay: 3.618723330959624e-05
+  stopped: 1
+  trial_id: 6
+  val_accuracies:
+  - - 0
+    - 0.3397953688745288
+trial_7:
+  best_val_err: 0.5574274944226478
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_7
+  params:
+    amount_of_layers_to_finetune: 4
+    dropout_rate: 0.4609371175115584
+    lr: 5.4880470007660465e-06
+    token_length: 64
+    weight_decay: 0.029794544625913636
+  stopped: 1
+  trial_id: 7
+  val_accuracies:
+  - - 0
+    - 0.4425725055773521
+trial_8:
+  best_val_err: 0.7197476728979153
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_8
+  params:
+    amount_of_layers_to_finetune: 1
+    dropout_rate: 0.41436875457596467
+    lr: 2.259279742015697e-06
+    token_length: 256
+    weight_decay: 8.777815504719648e-05
+  stopped: 1
+  trial_id: 8
+  val_accuracies:
+  - - 0
+    - 0.28025232710208475
+trial_9:
+  best_val_err: 0.6181244711131626
+  load_path: /work/dlclarge1/kayak-workspacename/automl-exam-ss25-text-dasauto/results/dataset=yelp/seed=42/optuna_2/trial_9
+  params:
+    amount_of_layers_to_finetune: 0
+    dropout_rate: 0.49344346830025865
+    lr: 2.67308831078167e-05
+    token_length: 128
+    weight_decay: 0.010256162748473083
+  stopped: 1
+  trial_id: 9
+  val_accuracies:
+  - - 0
+    - 0.38187552888683746

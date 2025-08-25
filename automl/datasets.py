@@ -43,12 +43,12 @@ class BaseTextDataset(ABC):
         val_size: float = 0.2,
         random_state: int = 42,
         set_class_count_min: bool = False,
-        use_class_weights: bool = True
+        use_class_weights: bool = True,
+        data_fraction: float = 1.0
     ) -> Dict[str, Any]:
         """Create train/validation/test dataloaders and preprocessing objects."""
         train_df, test_df = self.load_data()  # not implemented in base class `BaseTextDataset`
-        label_column = train_df.columns[1]
-        print("Train_df before split with labels and class instance counts:\n", train_df[label_column].value_counts())
+        print("Train_df before split with labels and class instance counts:\n", train_df["label"].value_counts())
         
         # only one data balancing technique can be used at a time
         if set_class_count_min and use_class_weights:
@@ -76,6 +76,30 @@ class BaseTextDataset(ABC):
         if val_df is not None:
             val_df['text'] = val_df['text'].apply(self.preprocess_text)
         test_df['text'] = test_df['text'].apply(self.preprocess_text)
+        
+        # Remove rows with empty text after preprocessing
+        initial_train_len = len(train_df)
+        train_df = train_df[train_df['text'].str.len() > 0]
+        removed_train = initial_train_len - len(train_df)
+        if removed_train > 0:
+            print(f"Removed {removed_train} rows with empty text from training data")
+        
+        if val_df is not None:
+            initial_val_len = len(val_df)
+            val_df = val_df[val_df['text'].str.len() > 0]
+            removed_val = initial_val_len - len(val_df)
+            if removed_val > 0:
+                print(f"Removed {removed_val} rows with empty text from validation data")
+        
+        initial_test_len = len(test_df)
+        test_df = test_df[test_df['text'].str.len() > 0]
+        removed_test = initial_test_len - len(test_df)
+        if removed_test > 0:
+            print(f"Removed {removed_test} rows with empty text from test data")
+
+        if data_fraction < 1:
+            train_df = self.get_fraction_of_data(train_df, fraction=data_fraction)
+            val_df = self.get_fraction_of_data(val_df, fraction=data_fraction) if val_df is not None else None
 
         return {
             'train_df': train_df,
@@ -89,10 +113,9 @@ class BaseTextDataset(ABC):
         """Set class instances to lowest value. Used to ensure balanced classes. Wastes data.
         Deprecated with the use of class weights."""
         # get class counts, sort by label from 0 to <num_classes>
-        label_column = train_df.columns[1]
         class_counts = self.get_num_classes(train_df)
         # print("train_df before split, original class counts", class_counts)
-        class_instance_counts = train_df[label_column].value_counts().sort_index().to_numpy()
+        class_instance_counts = train_df["label"].value_counts().sort_index().to_numpy()
         # print("train_df before split, original class counts", class_counts)
         
         # find the minimum number of instances in any class
@@ -100,19 +123,18 @@ class BaseTextDataset(ABC):
 
         # Subsample each class to the minimum class count
         subsampled_dfs = []
-        for label, group in train_df.groupby(label_column):
+        for label, group in train_df.groupby("label"):
             subsampled = group.sample(n=min_class_count, random_state=random_state)
             subsampled_dfs.append(subsampled)
         train_df = pd.concat(subsampled_dfs)
         # print(f"New dataset length: {len(train_df)}")
-        print(train_df[label_column].value_counts())
+        print(train_df["label"].value_counts())
 
     def get_class_weights(self, train_df: pd.DataFrame) -> Dict[int, float]:
         """Get class weights for imbalanced datasets."""
-        label_column = train_df.columns[1]
         class_counts = self.get_num_classes(train_df)
-        # print("train_df after split, original class counts", class_counts)
-        class_instance_counts = train_df[label_column].value_counts().sort_index().to_numpy()
+        print("train_df after split, original class counts", class_counts)
+        class_instance_counts = train_df["label"].value_counts().sort_index().to_numpy()
         # print("train_df after split, original class counts", class_instance_counts)
         
         # Calculate class weights
@@ -120,9 +142,20 @@ class BaseTextDataset(ABC):
         class_weights = total_instances / class_instance_counts
         # print("class weights", class_weights, type(class_weights))
         normalized_class_weights = class_weights * (len(class_instance_counts) / np.sum(class_weights))
-        # print("normalized class weights", normalized_class_weights, type(normalized_class_weights))
-
+        print("normalized class weights", normalized_class_weights, type(normalized_class_weights))
         return normalized_class_weights
+    
+    def get_fraction_of_data(self, df: pd.DataFrame, fraction: float) -> pd.DataFrame:
+        """Get a fraction of the data."""
+        print(f"Subsampling training data to {fraction * 100}%")
+
+        _subsample = np.random.choice(
+            list(range(len(df))),
+            size=int(fraction * len(df)),
+            replace=False,
+        )
+        df = df.iloc[_subsample]
+        return df
 
 class AGNewsDataset(BaseTextDataset):
     """AG News dataset for news categorization (4 classes)."""
@@ -196,13 +229,21 @@ class DBpediaDataset(BaseTextDataset):
         test_df['label'] = test_df['label'].replace(-1, class_num - 1)
 
         return train_df, test_df
+    
+class YelpDataset(BaseTextDataset):
+    """Yelp Reviews 5-star rating dataset."""
+    
+    def load_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Load Yelp 5-star data."""
+        train_path = self.data_path / "yelp" / "train.csv"
+        test_path = self.data_path / "yelp" / "test.csv"
+        
+        if train_path.exists() and test_path.exists():
+            train_df = pd.read_csv(train_path)
+            test_df = pd.read_csv(test_path)
+        else:
+            raise FileNotFoundError(f"Data files not found at {train_path}, generating dummy data...")
+        
+        return train_df, test_df
 
-def get_fraction_of_data(self, df: pd.DataFrame, fraction: float) -> pd.DataFrame:
-        """Get a fraction of the data."""
-        _subsample = np.random.choice(
-            list(range(len(df))),
-            size=int(fraction * len(df)),
-            replace=False,
-        )
-        df = df.iloc[_subsample]
-        return df
+
