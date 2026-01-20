@@ -43,62 +43,60 @@ python -c "import automl; print(automl.__file__)"
 # this should print the full path to your cloned install of this repo
 ```
 
-We make no restrictions on the python library or version you use, but we recommend using python 3.10 or higher.
+## The code provided by the university
 
-## Code
-
-We provide the following:
+They provided the following:
 
 * `run.py`: A script that trains an _AutoML-System_ on the training split of a given dataset and 
   then generates predictions for the test split, saving those predictions to a file. 
   For the training datasets, the test splits will contain the ground truth labels, but for the 
   test dataset which we provide later the labels of the test split will not be available. 
-  You will be expected to generate these labels yourself and submit them to us through GitHub classrooms.
 
 * `automl`: This is a python package that will be installed above and contain your source code for whatever
   system you would like to build. We have provided a dummy `AutoML` class to serve as an example.
 
-*You are completely free to modify, install new libraries, make changes and in general do whatever you want with the code.* 
-The *only requirement* for the exam will be that you can generate predictions for the test splits of our datasets in a `.npy` file that we can then use to give you a test score through GitHub classrooms.
+They have been almost completely changed but the backbone still remains.
 
+## Project Constraints
 
-## Data
+In this project we had a 24 hour time constraint. Since we decided to use only transformers and fine tune some models it was very time consuming. We started with the idea of a nested NAS and HPO model but after noticing how time intensive it was we switched to an only HPO pipeline. 
 
-We selected 4 different text-classification datasets which you can use to develop your AutoML system and we will provide you with 
-a test dataset to evaluate your system at a later point in time. 
+## Hyperparameters
+In this project we have done hyperparameter optimization for the following hyperparameters:
+Learning rate: Log-uniform, [1e-6, 1e-2]
+Token length: Categorical, {64, 128, 256}
+Weight decay: Log-uniform, [1e-6, 0.1]
+Layers to finetune: Integer, [0–6]
+Dropout rate: [0.0, 0.5]
 
-The dataset can be automatically or programatically downloaded and extracted from: [https://ml.informatik.uni-freiburg.de/research-artifacts/automl-exam-25-text/text-phase1.zip](https://ml.informatik.uni-freiburg.de/research-artifacts/automl-exam-25-text/text-phase1.zip)
+There are some NAS related hyperparameters for the classification head that can be added with minor changes in the code. These are:
+hidden_dim = Categorical, [64, 128, 256]
+activation = Categorical, ["ReLU", "GELU", "LeakyReLU"]
+hidden_layer = Integer, [1, 4]
+use_layer_norm = Categorical, [True, False]
 
-The downloaded datasets should have the following structure:
-```bash
-<target-folder>
-├── ag_news
-│   ├── train.csv
-│   ├── test.csv
-├── amazon
-│   ├── train.csv
-│   ├── test.csv
-├── imdb
-│   ├── train.csv
-│   ├── test.csv
-├── dbpedia
-│   ├── train.csv
-│   ├── test.csv
-```
+## How we got here
+Since we have a mixed Hyperparameter search space that consists of both numerical and categorical values the best fitting Bayesian Optimization approach would be to use a Gaussian Process with a suitable kernel that can handle both types of variables. Also since training trasnformers can be very expensive we wanted go with some multi fidelity approaches. Putting all of these criteri together and with the fact that our lecturer was the creator of BOHB (Bayesian Optimization and Hyperband) we decided to try it out.
 
+BOHB code was done with RayTune and it is working. It can be run by
+python -m automl.automl_methods.hpo.bohb
 
-## Running an initial test
+BOHB ended up being too time intensive and it takes a few runs of succesive halving to leverage TPEs abilities so with out low bodget it was just working as hyperband. So we came up with the ide for the project. 
 
-After having downloaded and extracted the data at a suitable location, this is the parent data directory. \\
-To run a quick test:
+## Project Idea
 
-```bash
-python run.py \
-  --data-path <path-to-data-parent> \
-  --dataset amazon \
-  --epochs 1 \
-  --data-fraction 0.2
-```
-*TIP*: play with the batch size and different approaches for an epoch (or few mini-batches) to estimate compute requirements given your hardware availability.
+THe probelm we had with bohb was that it took a long time to leverage TPEs abilities. Also in general multi fidelity approaches also took more time then we anticipated.
 
-You are free to modify these files and command line arguments as you see fit.
+There are two parts of this idea so lets start with the ensemble hyperband part
+
+## 1- Ensemble Hyperband
+
+This idea came from evolutionary algorithms. In evolutionary algorithms at every step a population of models is evaluated and the best performing models are selected for the next iteration. Then in the next step new configurations (children) are generated and they are evaluated all together. So we though why not do this with succesive halving. 
+
+## 2- leveraging TPE sooner
+
+For each layer there is a TPE and untill the layers tpe matures it uses the preivous layers TPE. It is only limited to the previous layer because we dont want it to converge to a lcal minima.
+
+## Notice
+
+This project is more of an idea, it is not a felixble implementation due to time constraints. I will keep wokring on it further with tabular data for faster experiments. The idea is not explained very clearly because I believe its promising and I would like to prepare solid outputs and share it with my instructures before I make it public.
