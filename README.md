@@ -2,7 +2,7 @@
 
 This project implements an AutoML system for text classification, developed as part of the AutoML course (SS25) at the University of Freiburg.
 The initial template was provided by the course instructors, and we extended it into a working AutoML pipeline as part of the final exam project.
-This project consists of a creative solution to budget extensive AutoML methods while maintaining high performance.
+This project consists of a solution inspired by evolutionary algorithms to speed up Hyperband while using Bayesian Optimization with a layer system to improve performance.
 
 ## Motivation
 Our hyperparameter search space contains both continuous and categorical variables so the best fitting Bayesian Optimization approach would be to use a Gaussian Process with a suitable kernel that can handle both types of variables. Also since training transformers can be very expensive we wanted go with some multi fidelity approaches. Putting all of these criteria together to try BOHB out.
