@@ -1,4 +1,4 @@
-# AutoML for Text Classification
+# Ensemble Hyperband
 
 This project implements an AutoML system for text classification, developed as part of the AutoML course (SS25) at the University of Freiburg.
 The initial template was provided by the course instructors, and we extended it into a working AutoML pipeline as part of the final exam project.
