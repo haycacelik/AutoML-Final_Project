@@ -1,4 +1,3 @@
-# Ensemble Hyperband
 
 This project implements an AutoML system for text classification, developed as part of the AutoML course (SS25) at the University of Freiburg.
 The initial template was provided by the course instructors, and we extended it into a working AutoML pipeline as part of the final exam project.
@@ -22,6 +21,17 @@ This idea came from evolutionary algorithms. In evolutionary algorithms at every
 ### 2- Leveraging TPE Sooner
 
 For each layer there is a TPE and until that layers TPE matures it uses the preivous layers TPE. It is only limited to the previous layer because we dont want it to converge to a local minima.
+
+### - Below is a visual demonstrating the layer parameter selection
+<img width="827" height="490" alt="ensemble hb drawio (1)" src="https://github.com/user-attachments/assets/38bd8b8d-ec5e-4b64-b529-3adbbc1871ba" />
+
+### - Below is a visual demonstrating the time gain compared to classical hyperband. This results in a %33 percent time gain.
+<img width="701" height="362" alt="epoch_gains drawio" src="https://github.com/user-attachments/assets/d8a14041-5487-4355-a83c-58c57dac5e04" />
+
+### - Below, it can be seen that the parameters at the second layer, which was the only layer where TPE was active in this short experiment, consistently outperformed the randomly generated samples at other layers. This can be judged by the compilations that made it to the last layer being mostly blue (from the second layers, compiled with tpe). This has been tested 4 times andd each time it resulted similarly. 
+<img width="3600" height="2100" alt="final_plot_seaborn" src="https://github.com/user-attachments/assets/6996bcad-d5bd-4a78-94ad-60d7750473a1" />
+
+## - Note that this project was not compared to other methods after being tested with a high time budget, but the inital results are promising.
 
 ## Project Constraints
 
