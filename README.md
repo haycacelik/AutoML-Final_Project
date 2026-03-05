@@ -4,7 +4,7 @@ The initial template was provided by the course instructors, and we extended it 
 This project consists of a solution inspired by evolutionary algorithms to speed up Hyperband while using Bayesian Optimization with a layer system to improve performance.
 
 ## Motivation
-Our hyperparameter search space contains both continuous and categorical variables so the best fitting Bayesian Optimization approach would be to use a Gaussian Process with a suitable kernel that can handle both types of variables. Also since training transformers can be very expensive we wanted go with some multi fidelity approaches. Putting all of these criteria together to try BOHB out.
+Our hyperparameter search space contains both continuous and categorical variables so the best fitting Bayesian Optimization approach would be to use a Gaussian Process with a suitable kernel that can handle both types of variables. Also since training transformers can be very expensive we wanted go with some multi fidelity approaches. Putting all of these criteria together we decided to try BOHB out.
 
 BOHB code was done with RayTune and it is working. It can be run by
 python -m automl.automl_methods.hpo.bohb
@@ -16,26 +16,22 @@ There are two parts to this idea:
 
 ### 1- Ensemble Hyperband
 
-This idea came from evolutionary algorithms. In evolutionary algorithms at every step, a population of models are evaluated and the best performing models are selected for the next iteration. Then in the next step, new configurations (children) are generated and they are evaluated all together. So we decided to evaluate the n amount of models at budget point and only allow the best n/2*k (k being the downsampling rate for hyperband) models for the next budget point along with the newly created n/2*k models. So the next step includes half the best models from the last layer and half the newly created ones.
+This idea came from evolutionary algorithms. We decided to evaluate the n amount of configs at a budget point and only allow the best n/2*k configurations (k being the downsampling rate for hyperband) for the next budget point. So the next step includes; one half the best configurations from the last layer and one half the newly compiled ones (children).
+
+- Below is a visual demonstrating the layer parameter selection
+<img width="827" height="490" alt="ensemble hb drawio (1)" src="https://github.com/user-attachments/assets/38bd8b8d-ec5e-4b64-b529-3adbbc1871ba" />
+
+
+
+- Below is a visual demonstrating the time gain compared to classical hyperband. This results in a %33 percent run-time improvement.
+<img width="701" height="362" alt="epoch_gains drawio" src="https://github.com/user-attachments/assets/d8a14041-5487-4355-a83c-58c57dac5e04" />
 
 ### 2- Leveraging TPE Sooner
 
-For each layer there is a TPE and until that layers TPE matures it uses the preivous layers TPE. It is only limited to the previous layer because we dont want it to converge to a local minima.
+For each layer there is a TPE and until the TPE of that layer matures it uses the TPE of the previous layer. The new configurations use the TPE if it is mature, if not they use random sampling. The usage of using the TPE of another layer is only limited to the previous layer because we dont want it to converge to a local minima. 
 
-### - Below is a visual demonstrating the layer parameter selection
-<img width="827" height="490" alt="ensemble hb drawio (1)" src="https://github.com/user-attachments/assets/38bd8b8d-ec5e-4b64-b529-3adbbc1871ba" />
-
-### - Below is a visual demonstrating the time gain compared to classical hyperband. This results in a %33 percent time gain.
-<img width="701" height="362" alt="epoch_gains drawio" src="https://github.com/user-attachments/assets/d8a14041-5487-4355-a83c-58c57dac5e04" />
-
-### - Below, it can be seen that the parameters at the second layer, which was the only layer where TPE was active in this short experiment, consistently outperformed the randomly generated samples at other layers. This can be judged by the compilations that made it to the last layer being mostly blue (from the second layers, compiled with tpe). This has been tested 4 times andd each time it resulted similarly. 
+- Below, it can be seen that the parameters at the second layer, which was the only layer where TPE was active in this short experiment, consistently outperformed the randomly generated configs at other layers. This can be judged by the configs that made it to the last layer being mostly blue (from the second layers, compiled with TPE). This has been tested 4 times andd each time it resulted similarly. 
 <img width="3600" height="2100" alt="final_plot_seaborn" src="https://github.com/user-attachments/assets/6996bcad-d5bd-4a78-94ad-60d7750473a1" />
-
-## - Note that this project was not compared to other methods after being tested with a high time budget, but the inital results are promising.
-
-## Project Constraints
-
-In this project we had a 24 hour run time constraint. We decided to use transformers and fine tune them. We started with the idea of a nested NAS and HPO model but after noticing how time intensive fine tuning transformer based morels are we switched to an only HPO pipeline. 
 
 ## Hyperparameters
 In this project we have done hyperparameter optimization for the following hyperparameters:
@@ -105,4 +101,4 @@ python -c "import automl; print(automl.__file__)"
 
 ## Notice
 
-This project is more of a proof of concept demonstrating feasibility, it is not a flexible implementation due to time constraints.
+This project is more of a proof of concept demonstrating feasibility, it is not a flexible implementation due to time constraints. Also this project has been tested with a limit of 24 hours run-time.
